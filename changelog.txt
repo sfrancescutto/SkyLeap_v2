@@ -1,0 +1,18 @@
+Main.cpp
+    Edited working frequency (50Hz -> 200Hz), hoping averaging can reduce sensors noise. Also we need to grant greater stability to the board itself.
+    Edited correction range, previously was 100 (for yaw, pitch and roll each) thato could lead to a difference in power between two opposing motors of 600, which is way too much.
+        Now it is 5 each, that sum up to a difference of 30, that I believe is much more adequate.
+    Edited power generator functions as they where compensating in the wrong way any displacement from setpoint 
+    Edited the use of cutoff function with sum_e[] as they made no sense.
+    Anticipated ESC definition as motors would randomly do extrashort movement if not told otherwise, which caused vibration (bad for sensor calibration)
+
+
+MPU9150.cpp
+    Edited readMagData function, now it returns the magnetometer read only if ready. This should allow higher frequency (at the cost of lower yaw knowledge)
+    A possible approach to overcome this issue is to use only gyroscope data to estimate yaw angle.
+
+    Edited readMagData function, I removed the int16_t cachedata array, as it looked redundant, and changed the way destination is generated.
+
+Channel.cpp
+    Edited Calibrate and Calibrate read functions (removed the 485-515 if statement as I couldn't see its purpose)
+    Added Order 3 Median filter to remove zero drops.
