@@ -1,6 +1,9 @@
 /* 
-By: Riccardo Medvescek
+Started by: Riccardo Medvescek
 date: 28/2/23
+Edited by: Stefano Francescutto
+in December 2023
+
 License: freeware
 This project is intended as an assessment exercise for an examination. The code is complete and ready 
 to be used, however, tuning of the PID coefficients and complementary filters has not been done. 
@@ -8,18 +11,18 @@ Mathematical simulation or empirical calibration work would be required.
 
 Hardware setup 
 
-MPU9150-----FRDM KL25Z:       ( /!\ be awere: I/O pin with I2C capabilities needed)
+MPU9150-----FRDM KL25Z:       ( /!\ beware: I/O pin with I2C capabilities needed)
  VDD     ->  3.3 V 
  SDA     ->  PTE0
  SCL     ->  PTE1
  GND     ->  GND
  others  ->  N.C.
-RF reciever-FRDM KL25Z:       ( /!\ be awere: I/O pin with interrupt capabilities needed)
+RF reciever-FRDM KL25Z:       ( /!\ beware: I/O pin with interrupt capabilities needed)
  CH 1    ->  PTD3
  CH 2    ->  PTD2 
  CH 3    ->  PTD0 
  CH 4    ->  PTD5 
-ESC PWM output:               ( /!\ be awere: I/O pin with PWM capabilities needed)
+ESC PWM output:               ( /!\ beware: I/O pin with PWM capabilities needed)
  ESC1    ->  PTB0
  ESC2    ->  PTB1
  ESC3    ->  PTB2
@@ -103,8 +106,19 @@ and could lead to bad error estimation due to wrong integration and derivation f
 #define Y           1     // Y axis
 #define Z           2     // Z axis
 
-#define DEBUG_PRINT(x) (printf("%d ",x))
-#define DEBUG_PRINTLN(x) (printf("%d\n",x))
+///USAGE: Same as printf -> DEBUGPRINT("%d, %d\n",N,M);
+#define DEBUG
+
+#ifdef DEBUG
+#define DEBUG_PRINT(format, args...) printf (format, args)
+#else
+#define DEBUG_PRINT(format, args...) 
+#endif
+
+// #define DEBUG_PRINT(x...) (printf("%d ",x))
+// #define DEBUG_PRINTLN(x) (printf("%d\n",x))
+// #define eprintf(...) printf (stderr, __VA_ARGS__)
+// #define eprintf(args...) printf (args)
 
 //calibration samples
 int sample=200;
@@ -117,9 +131,9 @@ int16_t raw_mag[3];
 //elaboreated data
 float   acc_angle[3];       //angle estimation from acc
 float   gyr_angle[3];       //angle estimation from acc
-float   alpha = 0.9;       //first complementary filter parameter
+float   alpha = 0.9;        //first complementary filter parameter
 float   beta  = 0.5;        //second complementary filter parameter
-float   gamma = 0;        //yaw speed complementary filter parameter //NOTA: ERA 0.7
+float   gamma = 0;          //yaw speed complementary filter parameter //NOTA: ERA 0.7
 float   mag_str[3];         //intermediate variable of magnetic field
 float   mag[3];             //magnetometer componets on earth system
 float   pitch,roll,yaw;     //final extimeted pitch roll and yaw
@@ -200,6 +214,20 @@ float soft_mag_main[3] = {0, 0, 0};
 //
 //|||||||||||||||||||||||||||||||||||||||||||||||||   MAIN   |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 //_______________________________________________________________________________________________________________________________________
+// template <typename T>
+// void debug_print(T t) 
+// {
+//     std::cout << t << std::endl ;
+// }
+
+// template<typename T, typename... Args>
+// void debug_print(T t, Args... args) // recursive variadic function
+// {
+//     std::cout << t <<std::endl ;
+
+//     debug_print(args...) ;
+// }
+
 void provaRadiocomando(){
     int read_throttle = 0;
     while(true) {
@@ -216,11 +244,11 @@ void provaRadiocomando(){
         set_point[2]  = (channel4.read() - 500) * 1.82;
         read_throttle = channel3.read();
 
-        // printf("%d, %d, %d, %d\n",set_point[0], set_point[1], read_throttle, set_point[2]);
-        DEBUG_PRINT(set_point[0]);
-        DEBUG_PRINT(set_point[1]);
-        DEBUG_PRINT(read_throttle);
-        DEBUG_PRINTLN(set_point[2]);
+        DEBUG_PRINT("%d, %d, %d, %d\n",set_point[0], set_point[1], read_throttle, set_point[2]);
+        // DEBUG_PRINT(set_point[0]);
+        // DEBUG_PRINT(set_point[1]);
+        // DEBUG_PRINT(read_throttle);
+        // DEBUG_PRINTLN(set_point[2]);
 
         CycleEnd = CycleTimer.elapsed_time().count();
         if (CycleTime < 20000) { //Questo è fisso a 50Hz
@@ -259,7 +287,8 @@ void provaMotori(){
                 } while (power[motore] < 1000 || power[motore] > 2000);
             printf("Invio al motore %d la potenza di %d/2000...\n",motore ,power[motore]);
 
-            for(int i = 0;i<200;i++) {
+            //4 seconds of test
+            for(int i = 0;i<80;i++) {
                 CycleTimer.start();
                 CycleBegin = CycleTimer.elapsed_time().count(); //Secondo me questo è sempre zero
 
@@ -296,6 +325,9 @@ void provaSensori(){
 
 
         // Accelerometer offset correction
+        // If the starting position of the MPU-9150 is horizontal,
+        // the expected values for X and Y acceleration are zero, 
+        // while the expected value for Z acceleration is g.
         raw_acc[0] -= offset_acc_main[0];
         raw_acc[1] -= offset_acc_main[1];
         raw_acc[2] -= offset_acc_main[2];
@@ -318,20 +350,28 @@ void provaSensori(){
         mag_str[2] =  raw_mag[2];
 
         // get angle aproximation by accelerometer vector
-        acc_angle[Y]    = -atan2(  raw_acc[X],  sqrtf( raw_acc[Y] * raw_acc[Y]  +  raw_acc[Z] * raw_acc[Z] )  ) ;
-        acc_angle[X]    = -atan2(  raw_acc[Y],  sqrtf( raw_acc[X] * raw_acc[X]  +  raw_acc[Z] * raw_acc[Z] )  ) ;
+        acc_angle[PITCH]    = -atan2(  raw_acc[X],  sqrtf( raw_acc[Y] * raw_acc[Y]  +  raw_acc[Z] * raw_acc[Z] )  ) ;
+        acc_angle[ROLL]     = -atan2(  raw_acc[Y],  sqrtf( raw_acc[X] * raw_acc[X]  +  raw_acc[Z] * raw_acc[Z] )  ) ;
+        //raw_acc[X] <= offset_acc_main[Z] ? acc_angle[PITCH] = asin(raw_acc[X]/offset_acc_main[Z]) : acc_angle[PITCH] = PI/2;
+        //raw_acc[Y] <= offset_acc_main[Z] ? acc_angle[ROLL] = asin(raw_acc[Y]/offset_acc_main[Z]) : acc_angle[ROLL] = PI/2;
+        //printf("%d, %d, %d\n",raw_acc[X],raw_acc[Y],raw_acc[Z]);
+        //raw_acc[X] <= 16384 ? acc_angle[PITCH] = asin(raw_acc[X]/16384.) : acc_angle[PITCH] = PI/2;
+        //raw_acc[Y] <= 16384 ? acc_angle[ROLL] = asin(raw_acc[Y]/16384.) : acc_angle[ROLL] = PI/2;
+        // acc_angle[PITCH] = atan2(raw_acc[X],raw_acc[Z]);
+        // acc_angle[ROLL] = atan2(raw_acc[Y],raw_acc[Z]);
 
         // get angle aproximation by angular speed integration (degrees to radiant (0.0174533)) (GSCF (65.5))
-        gyr_angle[Y]   += ( raw_gyr[Y] / FREQ / GSCF) * DEG2RAD;
-        gyr_angle[X]   += (-raw_gyr[X] / FREQ / GSCF) * DEG2RAD;
-        gyr_angle[Z]   += ( raw_gyr[Z] / FREQ / GSCF) * DEG2RAD;
+        gyr_angle[PITCH]   += ( raw_gyr[PITCH] / FREQ / GSCF) * DEG2RAD;
+        gyr_angle[X]   += (-raw_gyr[X] / FREQ / GSCF) * DEG2RAD; //This seems to be on the roll plane
 
-        //printf("%d,%d,", int(acc_angle[X]*1000), int(gyr_angle[X]*1000));
+        //printf("%d    %d\n", int(gyr_angle[X]*1000), int(acc_angle[ROLL]*1000));
 
         // compensate gyro angle with accelerometer angle in a complementary filter (accelerometer -> LF ; gyroscope -> HF)
-        gyr_angle[Y]    = gyr_angle[Y] * alpha + acc_angle[Y] * (1-alpha);
-        gyr_angle[X]    = gyr_angle[X] * alpha + acc_angle[X] * (1-alpha);
+        gyr_angle[Y]    = gyr_angle[Y] * alpha + acc_angle[PITCH] * (1-alpha);
+        gyr_angle[X]    = gyr_angle[X] * alpha + acc_angle[ROLL] * (1-alpha);
 
+        //test print of this estimation
+        // DEBUG_PRINT("gyr_angle(roll): %d    acc_angle(roll): %d\n", int(gyr_angle[X]*1000), int(acc_angle[ROLL]*1000));
         //printf("%d\n", int(gyr_angle[X]*1000));
 
         // compensate yawing motion in angle estimation
@@ -341,6 +381,10 @@ void provaSensori(){
         // get pitch and roll (low pass complementary filter)
         pitch  = pitch * beta + gyr_angle[Y] * (1-beta);
         roll   = roll  * beta + gyr_angle[X] * (1-beta);
+
+        // DEBUG_PRINT("100x roll  %d\n",int(roll*100));
+
+        //printf("gyr_angle(roll): %d    acc_angle(roll): %d\n", int(gyr_angle[X]*1000), int(acc_angle[ROLL]*1000));
 
         // get yaw estimation by magnetometer 
         mag[0] = mag_str[0] * cos(pitch) + mag_str[1] * sin(roll) * sin(pitch) - mag_str[2] * cos(roll) * sin(pitch);
@@ -354,12 +398,11 @@ void provaSensori(){
         total_yaw += angle[YAW];
         //angle[PITCH] = pitch *INT_SCAL;
         //angle[ROLL]  = roll  *INT_SCAL;
-        totalpitch += pitch *INT_SCAL;
-        totalroll  += roll  *INT_SCAL;
+        totalpitch += int(pitch *RAD2DEG*64);
+        totalroll  += int(roll  *RAD2DEG*64);
 
-        //printf("\nRollio: %d\nBeccheggio: %d\nImbardata: %d",angle[ROLL], angle[PITCH], angle[YAW]);
+        // DEBUG_PRINT("totalroll: %d\n",totalroll);
 
-        
         // hard to use directly the yaw angle to correct the drift
         // alternative: get the yaw anglular speed from a filtered compass which is driftless but noisy
         // and implementing another complementary filter: LP from compass and HP from gyroscope
@@ -416,19 +459,24 @@ void provaSensori(){
         if (++counter < FILTERING_ORDER) {
             continue;
         }
+
+        // DEBUG_PRINT("totalroll after continue: %d\n",totalroll);
         
-        totalpitch /= FILTERING_ORDER;
-        totalroll /= FILTERING_ORDER;
+        totalpitch /= (FILTERING_ORDER*64);
+        totalroll /= (FILTERING_ORDER*64);
         total_yaw /= FILTERING_ORDER;
 
         //velocità angolare sull'imbardata, da accelerometro, bussola e filtro.
         //printf("%d, %d, %d\n",int(average_delta_yaw*1024),int(( ( raw_gyr[Z] / FREQ / GSCF) * DEG2RAD )*INT_SCAL*1024),int(ang_speed[YAW]*1024));
         //beccheggio, rollio, imbardata data dalla bussola.
-        printf("%d, %d, %d\n",totalpitch, totalroll, total_yaw);
+        //printf("%d, %d, %d\n",totalpitch, totalroll, total_yaw);
+
+        DEBUG_PRINT("Rollio: %d\nBeccheggio: %d\nImbardata: %d\n\n",totalroll, totalpitch, angle[YAW]);
         
         totalpitch = 0;
         totalroll = 0;
         total_yaw = 0;
+        counter = 0;
 
         CycleEnd = CycleTimer.elapsed_time().count();
         if (CycleTime < 20000) { //Questo è fisso a 50Hz
@@ -575,9 +623,13 @@ int main()
     ThisThread::sleep_for(100ms);
     
     int mode = 0;
+    do {
     printf("1 --> Prova Radiocomando\n2 --> Prova Motori\n3 --> Prova Sensori\naltro --> Avvio normale\n");
     scanf("%d",&mode);
     switch(mode) {
+        case 0: 
+            printf("Avvio normale...\n");
+            break;
         case 1: 
             printf("Prova Radiocomando...\n");
             provaRadiocomando();
@@ -590,9 +642,11 @@ int main()
             printf("Prova Sensori...\n");
             provaSensori();
             break;
-        default: printf("Avvio normale...\n");
-        break;
+        default:
+            printf("Invalid mode, please try again.\n");
+            break;
     }
+    } while (mode != 0);
 
 //_______________________________________________________________________________________________________________________________________
 //
