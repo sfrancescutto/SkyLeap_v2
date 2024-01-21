@@ -104,45 +104,61 @@ void readGyroData(int16_t * destination) {
     destination[2] = (int16_t)(((int16_t)rawData[4] << 8) | rawData[5]) ; 
     }
 
+// void readMagData(int16_t * destination ) {
+//     uint8_t rawData[6];                                 // x/y/z gyro register data stored here
+//     //int16_t cachedata[3];
+//     writeByte(AK8975A_ADDRESS, AK8975A_CNTL, 0x01);     // toggle enable data read from magnetometer, no continuous read mode! 
+//     /*
+//     int counter = 0; //DEBUG
+//     while(not(readByte(AK8975A_ADDRESS, AK8975A_ST1) & 0x01)) { //Potrebbe essere questa la parte che fa perdere 8ms NOTA: LA MODIFICO
+//         wait_us(100);
+//         printf("Dati NON pronti, attendo 100 microsecondi") //DEBUG
+//         counter++; //DEBUG
+//     }
+//     readBytes(AK8975A_ADDRESS, AK8975A_XOUT_L, 6, &rawData[0]);  // Read the six raw data registers sequentially into data array
+//     printf("Dati PRONTI, ho atteso %d microsecondi",counter) //DEBUG
+    
+//     destination[0]   = ((int16_t)rawData[1] << 8) | rawData[0];   // Turn the MSB and LSB into a signed 16-bit value
+//     destination[1]   = ((int16_t)rawData[3] << 8) | rawData[2];
+//     destination[2]   = ((int16_t)rawData[5] << 8) | rawData[4];
+
+//     */
+//     //while(not(readByte(AK8975A_ADDRESS, AK8975A_ST1) & 0x01)){} //NOTA: Tecnicamente, il registro ST1 ha valori nulli su ogni bit tranne che il bit meno significativo, per cui mi pare superfluo l'AND
+//     if(readByte(AK8975A_ADDRESS, AK8975A_ST1)) {    //NOTA: Ora, il dato viene letto solamente se è pronto, altrimenti si tiene il dato vecchio. Si potrebbe anche pensare di usare solo il dato del giroscopio per intuire l'orientamento in questo caso
+//         readBytes(AK8975A_ADDRESS, AK8975A_XOUT_L, 6, &rawData[0]);
+//         destination[0]   = ((int16_t)rawData[1] << 8) | rawData[0];   // Turn the MSB and LSB into a signed 16-bit value
+//         destination[1]   = ((int16_t)rawData[3] << 8) | rawData[2];
+//         destination[2]   = ((int16_t)rawData[5] << 8) | rawData[4];
+//     }
+//     // cachedata[0]   = ((int16_t)rawData[1] << 8) | rawData[0] ;   // Turn the MSB and LSB into a signed 16-bit value
+//     // cachedata[1]   = ((int16_t)rawData[3] << 8) | rawData[2] ;  
+//     // cachedata[2]   = ((int16_t)rawData[5] << 8) | rawData[4] ; 
+//     // destination[0] =  cachedata[0];
+//     // destination[1] =  cachedata[1];
+//     // destination[2] =  cachedata[2];
+
+//     // destination[0]   = ((int16_t)rawData[1] << 8) | rawData[0];   // Turn the MSB and LSB into a signed 16-bit value
+//     // destination[1]   = ((int16_t)rawData[3] << 8) | rawData[2];
+//     // destination[2]   = ((int16_t)rawData[5] << 8) | rawData[4];
+
+//     }
+
 void readMagData(int16_t * destination ) {
     uint8_t rawData[6];                                 // x/y/z gyro register data stored here
-    //int16_t cachedata[3];
-    writeByte(AK8975A_ADDRESS, AK8975A_CNTL, 0x01);     // toggle enable data read from magnetometer, no continuous read mode! 
-    /*
-    int counter = 0; //DEBUG
-    while(not(readByte(AK8975A_ADDRESS, AK8975A_ST1) & 0x01)) { //Potrebbe essere questa la parte che fa perdere 8ms NOTA: LA MODIFICO
+    int16_t cachedata[3];
+    writeByte(AK8975A_ADDRESS, AK8975A_CNTL, 0x01);     // toggle enable data read from magnetometer, no continuous read mode!
+    while(not(readByte(AK8975A_ADDRESS, AK8975A_ST1) & 0x01)) {
         wait_us(100);
-        printf("Dati NON pronti, attendo 100 microsecondi") //DEBUG
-        counter++; //DEBUG
     }
     readBytes(AK8975A_ADDRESS, AK8975A_XOUT_L, 6, &rawData[0]);  // Read the six raw data registers sequentially into data array
-    printf("Dati PRONTI, ho atteso %d microsecondi",counter) //DEBUG
+    cachedata[0]   = ((int16_t)rawData[1] << 8) | rawData[0] ;   // Turn the MSB and LSB into a signed 16-bit value
+    cachedata[1]   = ((int16_t)rawData[3] << 8) | rawData[2] ;  
+    cachedata[2]   = ((int16_t)rawData[5] << 8) | rawData[4] ; 
+    destination[0] =  cachedata[0];
+    destination[1] =  cachedata[1];
+    destination[2] =  cachedata[2];
+    }
     
-    destination[0]   = ((int16_t)rawData[1] << 8) | rawData[0];   // Turn the MSB and LSB into a signed 16-bit value
-    destination[1]   = ((int16_t)rawData[3] << 8) | rawData[2];
-    destination[2]   = ((int16_t)rawData[5] << 8) | rawData[4];
-
-    */
-    //while(not(readByte(AK8975A_ADDRESS, AK8975A_ST1) & 0x01)){} //NOTA: Tecnicamente, il registro ST1 ha valori nulli su ogni bit tranne che il bit meno significativo, per cui mi pare superfluo l'AND
-    if(readByte(AK8975A_ADDRESS, AK8975A_ST1)) {    //NOTA: Ora, il dato viene letto solamente se è pronto, altrimenti si tiene il dato vecchio. Si potrebbe anche pensare di usare solo il dato del giroscopio per intuire l'orientamento in questo caso
-        readBytes(AK8975A_ADDRESS, AK8975A_XOUT_L, 6, &rawData[0]);
-        destination[0]   = ((int16_t)rawData[1] << 8) | rawData[0];   // Turn the MSB and LSB into a signed 16-bit value
-        destination[1]   = ((int16_t)rawData[3] << 8) | rawData[2];
-        destination[2]   = ((int16_t)rawData[5] << 8) | rawData[4];
-    }
-    // cachedata[0]   = ((int16_t)rawData[1] << 8) | rawData[0] ;   // Turn the MSB and LSB into a signed 16-bit value
-    // cachedata[1]   = ((int16_t)rawData[3] << 8) | rawData[2] ;  
-    // cachedata[2]   = ((int16_t)rawData[5] << 8) | rawData[4] ; 
-    // destination[0] =  cachedata[0];
-    // destination[1] =  cachedata[1];
-    // destination[2] =  cachedata[2];
-
-    // destination[0]   = ((int16_t)rawData[1] << 8) | rawData[0];   // Turn the MSB and LSB into a signed 16-bit value
-    // destination[1]   = ((int16_t)rawData[3] << 8) | rawData[2];
-    // destination[2]   = ((int16_t)rawData[5] << 8) | rawData[4];
-
-    }
-
 void initMPU9150() {                                // wake up device
     writeByte(MPU9150_ADDRESS, PWR_MGMT_1, 0x00);   // Clear sleep mode bit (6), enable all sensors 
     ThisThread::sleep_for(200ms);                                    // Delay 100 ms for PLL to get established on x-axis gyro; should check for PLL ready interrupt  
@@ -168,5 +184,7 @@ void initMPU9150() {                                // wake up device
     // can join the I2C bus and all can be controlled by the Arduino as master
     writeByte(MPU9150_ADDRESS, INT_PIN_CFG, 0x22);    
     writeByte(MPU9150_ADDRESS, INT_ENABLE, 0x01);  // Enable data ready (bit 0) interrupt
+
+    writeByte(AK8975A_ADDRESS, AK8975A_CNTL, 0x01);
     }
     

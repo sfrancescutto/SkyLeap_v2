@@ -173,7 +173,7 @@ void default_mag() {
 //--------READ and on flight calibration of magnetic sensor------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-void readMagData_calibr(int16_t * destination ) {
+void readMagData_calibr(int16_t * destination, int* hard_mag, float* soft_mag) {
     int16_t values[3];          //read data
     //serviceT.start();
     readMagData(values);
@@ -181,7 +181,7 @@ void readMagData_calibr(int16_t * destination ) {
     //printf("read Time %d   ", serviceT.read_us());
     //serviceT.reset();
 
-    bool changes= false;        //max/min change flag
+    bool changes= false;        //max/min change flag    
     if (values[X] > mag_max[X]) {
         mag_max[X] = values[X];
         changes = true;
