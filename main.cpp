@@ -95,7 +95,8 @@ and could lead to bad error estimation due to wrong integration and derivation f
 #define PERIOD2     PERIOD/FILTERING_ORDER
 #define DEG2RAD     0.0174533 
 #define RAD2DEG     57.2958
-#define GSCF        65.5        //Gyroscope Scaling Factor
+// #define GSCF        65.5        //Gyroscope Scaling Factor
+#define GSCF        131        //Gyroscope Scaling Factor
 #define INT_SCAL    2607.59     //Scale radiant to int: 0.0174533 = 1Â° = 45   ||  PI = 180Â° = 8192
 
 //default value
