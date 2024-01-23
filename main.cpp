@@ -89,7 +89,7 @@ and could lead to bad error estimation due to wrong integration and derivation f
 
 #define PI          3.14159265
 // #define FREQ        100.0  //Hz    Change this value to change the frequency of the cycle  //NOTA VA VERIFICATO SE IL TELECONMANDO FUNZIONA ANCORA BENE
-#define FILTERING_ORDER 2
+#define FILTERING_ORDER 4
 #define FREQ        50.0*FILTERING_ORDER  //Hz    Change this value to change the frequency of the cycle  //NOTA VA VERIFICATO SE IL TELECONMANDO FUNZIONA ANCORA BENE
 #define PERIOD      20000 //microseconds
 #define PERIOD2     PERIOD/FILTERING_ORDER
@@ -129,7 +129,7 @@ int16_t raw_mag[3];
 float   acc_angle[3];       //angle estimation from acc
 float   gyr_angle[3];       //angle estimation from acc
 double gyr_delta[3];
-float   alpha = 0.9;        //first complementary filter parameter
+float   alpha = 0.02;        //first complementary filter parameter
 float   beta  = 0.5;        //second complementary filter parameter
 float   gamma = 0;          //yaw speed complementary filter parameter //NOTA: ERA 0.7
 float   mag_str[3];         //intermediate variable of magnetic field
@@ -393,16 +393,23 @@ void provaMotori(){
 }
 
 void provaSensori(){
+    float avg_acc_angle[3] = {0., 0., 0.};
+    float tot_gyr_angle[3] = {0., 0., 0.};
+    float new_ang_estim[3] = {0., 0., 0.};
     int totalpitch = 0;
     int totalroll = 0;
-    float totalpitchf = 0.;
-    float totalrollf = 0.;
-    float totaldeltayaw = 0.;
+    double totalpitchf = 0.;
+    double totalrollf = 0.;
+    double totaldeltayaw = 0.;
     int total_yaw = 0;
     short counter = 0;
-    int my_yaw_guess = 0;
-    float my_other_yaw_guess = 0.;
-    float my_deltayaw_guess = 0.;
+    long my_yaw_guess = 0;
+    double my_other_yaw_guess = 0.;
+    double my_deltayaw_guess = 0.;
+    double my_pitch_gyr_angle = 0.;
+
+    double gyroscope_conversion_constant = 1/(FREQ*GSCF);
+
     for(int k = 0;k>-1;k++) {
         CycleTimer.start();
 
@@ -427,10 +434,21 @@ void provaSensori(){
         acc_angle[PITCH]    = -atan2(  raw_acc[X],  sqrtf( raw_acc[Y] * raw_acc[Y]  +  raw_acc[Z] * raw_acc[Z] )  ) ;
         acc_angle[ROLL]     = -atan2(  raw_acc[Y],  sqrtf( raw_acc[X] * raw_acc[X]  +  raw_acc[Z] * raw_acc[Z] )  ) ;
 
+        //NEW APPROACH
+        avg_acc_angle[PITCH] += -atan2( raw_acc[X],  sqrtf( raw_acc[Y] * raw_acc[Y]  +  raw_acc[Z] * raw_acc[Z] ) ) ;
+        avg_acc_angle[ROLL]  += -atan2( raw_acc[Y],  sqrtf( raw_acc[X] * raw_acc[X]  +  raw_acc[Z] * raw_acc[Z] ) ) ;
+
         // get angle aproximation by angular speed integration (degrees to radiant (0.0174533)) (GSCF (65.5))
         gyr_angle[Y]   += ( raw_gyr[Y] / FREQ / GSCF) * DEG2RAD;
         gyr_angle[X]   += (-raw_gyr[X] / FREQ / GSCF) * DEG2RAD;
         gyr_angle[Z]   += (raw_gyr[Z] / FREQ / GSCF);
+
+        new_ang_estim[Y]   += raw_gyr[Y] * gyroscope_conversion_constant * DEG2RAD;
+        //NOTE: we use -= instead of += because the positive sign of our frame is opposite to the positive sign of the gyroscope.
+        new_ang_estim[X]   -= raw_gyr[X] * gyroscope_conversion_constant * DEG2RAD;
+
+        tot_gyr_angle[Y]   += ( raw_gyr[Y] * gyroscope_conversion_constant); //DEGREES
+        tot_gyr_angle[Z]   += ( raw_gyr[Z] * gyroscope_conversion_constant); //DEGREES
         // DEBUG_PRINT("gyr_angle[Z]: %d\n",int(gyr_angle[Z]));
 
         // compensate gyro angle with accelerometer angle in a complementary filter (accelerometer -> LF ; gyroscope -> HF)
@@ -440,6 +458,9 @@ void provaSensori(){
         // compensate yawing motion in angle estimation
         gyr_angle[Y]   += gyr_angle[X] * sin( ( raw_gyr[Z] / FREQ / GSCF) * DEG2RAD );
         gyr_angle[X]   -= gyr_angle[Y] * sin( ( raw_gyr[Z] / FREQ / GSCF) * DEG2RAD );
+
+        new_ang_estim[Y]   += gyr_angle[X] * sin( raw_gyr[Z] * gyroscope_conversion_constant * DEG2RAD );
+        new_ang_estim[X]   -= gyr_angle[Y] * sin( raw_gyr[Z] * gyroscope_conversion_constant * DEG2RAD );
 
         // get pitch and roll (low pass complementary filter)
         pitch  = pitch * beta + gyr_angle[Y] * (1-beta);
@@ -452,33 +473,57 @@ void provaSensori(){
                 
         totalpitchf += pitch;
         totalrollf  += roll;
-        totaldeltayaw += (raw_gyr[Z] / FREQ / GSCF); //DEGREES!
+        totaldeltayaw += raw_gyr[Z] * gyroscope_conversion_constant; //DEGREES!
         // DEBUG_PRINT("TotalDeltaYaw: %d\n",int(totaldeltayaw));
         total_yaw += int(gyr_angle[Z]*64);
-        my_deltayaw_guess += gyr_delta[Z];
+        my_deltayaw_guess += (raw_gyr[Z] / FREQ / GSCF); //degrees!
+        my_pitch_gyr_angle += (raw_gyr[Y] / FREQ /GSCF);
 
         if (++counter < FILTERING_ORDER) {
             CycleEnd = CycleTimer.elapsed_time().count();
             if (CycleEnd < PERIOD2*counter) {
                 wait_us(int(PERIOD2*counter - CycleEnd));
             } else 
-                printf("!!!WARNING!!! Filtering Order is too high for the device to work properly!\n");
+                printf(" !!!WARNING!!! Filtering Order is too high for the device to work properly!\n");
             continue;
         }
 
-        // DEBUG_PRINT("\ncos(pitch): %d\ncos(roll): %d\n",int(cos(totalpitchf/FILTERING_ORDER)*1000),int(cos(totalrollf/FILTERING_ORDER)*1000));
-        // DEBUG_PRINT("Calcolo MYG: %d\n",int((totaldeltayaw/(cos(totalpitchf/FILTERING_ORDER)*cos(totalrollf/FILTERING_ORDER)))*64)/FILTERING_ORDER);
-        // DEBUG_PRINT("Senza *64: %d\n",int(totaldeltayaw/(cos(totalpitchf/FILTERING_ORDER)*cos(totalrollf/FILTERING_ORDER)))/FILTERING_ORDER);
-        // DEBUG_PRINT("total_delta_yaw e basta: %d/1000\n\n",int(totaldeltayaw*1000/FILTERING_ORDER));
-        my_yaw_guess += int((totaldeltayaw/(cos(totalpitchf/FILTERING_ORDER)*cos(totalrollf/FILTERING_ORDER)))*64);
-        my_other_yaw_guess += int(totaldeltayaw*64);
+        avg_acc_angle[0] /=4;
+        avg_acc_angle[1] /=4;
+
+        new_ang_estim[Y] = new_ang_estim[Y] * alpha + avg_acc_angle[PITCH] * (1-alpha);
+        new_ang_estim[X] = new_ang_estim[X] * alpha + avg_acc_angle[ROLL] * (1-alpha);
+
+        // new_ang_estim[Z] += tot_gyr_angle[Y]*sin(new_ang_estim[X]) + tot_gyr_angle[Z]*cos(new_ang_estim[X]);
+
+        // DEBUG_PRINT("new_angle_estimation: %d\n",int(totalrollf/FILTERING_ORDER*RAD2DEG));
+
+        new_ang_estim[Z] += tot_gyr_angle[Z]*cos(totalrollf/FILTERING_ORDER) - tot_gyr_angle[Y]*sin(totalrollf/FILTERING_ORDER);
+        //  +
+        DEBUG_PRINT("yaw estimation: %d\n",int(new_ang_estim[Z]));
+
+
+        tot_gyr_angle[Y] = 0.;
+        tot_gyr_angle[Z] = 0.;
+
+        double cos_pitch = cos(totalpitchf/FILTERING_ORDER);
+        double sin_pitch = sin(totalpitchf/FILTERING_ORDER);
+        double cos_roll = 1;//cos(totalrollf/FILTERING_ORDER);
+
+        my_yaw_guess += long((totaldeltayaw/(cos(totalpitchf/FILTERING_ORDER)*cos(totalrollf/FILTERING_ORDER)))*64);
+        my_yaw_guess += long((totaldeltayaw/(cos_pitch*cos_roll))*64);
+        my_other_yaw_guess += totaldeltayaw*cos_pitch + my_pitch_gyr_angle*sin_pitch;
 
         totalpitch /= (FILTERING_ORDER*64);
         totalroll /= (FILTERING_ORDER*64);
         total_yaw /= (FILTERING_ORDER*64);
+        // DEBUG_PRINT("old angle estimation:%d\n\n",totalroll);
+        // my_yaw_guess /= (64*FILTERING_ORDER*8);
+        // my_other_yaw_guess = 0;
 
-        // DEBUG_PRINT("Rollio: %d\nBeccheggio: %d\nImbardata: %d\n",totalroll, totalpitch, total_yaw);
-        DEBUG_PRINT("yaw_guess: %d\nother_guess: %d\n\n", my_yaw_guess/(64*FILTERING_ORDER*4),my_other_yaw_guess/(64*FILTERING_ORDER));
+        // DEBUG_PRINT("Rollio: %d\nBeccheggio: %d\nImbardata: %ld\n",totalroll, totalpitch, my_yaw_guess/(64*FILTERING_ORDER*8));
+        // DEBUG_PRINT("guess: %ld\nother_guess: %d\n\n",my_yaw_guess,int(my_other_yaw_guess));
+
         totalpitch = 0;
         totalroll = 0;
         total_yaw = 0;
@@ -486,7 +531,7 @@ void provaSensori(){
         totalpitchf = 0.;
         totalrollf  = 0.;
         totaldeltayaw = 0.;
-        my_other_yaw_guess = 0.;
+        my_pitch_gyr_angle = 0.;
 
         my_deltayaw_guess = 0;
         counter = 0;
