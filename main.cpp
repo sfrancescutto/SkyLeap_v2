@@ -88,7 +88,6 @@ and could lead to bad error estimation due to wrong integration and derivation f
 #include "Quaternion.hpp"
 
 #define PI          3.14159265
-// #define FREQ        100.0  //Hz    Change this value to change the frequency of the cycle  //NOTA VA VERIFICATO SE IL TELECONMANDO FUNZIONA ANCORA BENE
 #define FILTERING_ORDER 4
 #define FREQ        50.0*FILTERING_ORDER  //Hz    Change this value to change the frequency of the cycle  //NOTA VA VERIFICATO SE IL TELECONMANDO FUNZIONA ANCORA BENE
 #define PERIOD      20000 //microseconds
@@ -126,7 +125,7 @@ int16_t raw_acc[3];
 int16_t raw_gyr[3];
 int16_t raw_mag[3];
 
-//elaboreated data
+//elaborated data
 float   acc_angle[3];       //angle estimation from acc
 float   gyr_angle[3];       //angle estimation from acc
 double gyr_delta[3];
@@ -150,12 +149,10 @@ short int fifoRegIndex = 0;
 double average_delta_yaw;
 
 //PID coefficients (Yaw, Pitch, Roll)
-//float Kp[3] = {4.0, 1.3, 1.3};   
-//float Ki[3] = {0.00, 0.00, 0.00}; 
-//float Kd[3] = {0, 18, 18};
-float Kp[3] = {1, 1, 1};    
+///NOTE: THEY NEED TO BE TUNED 
+float Kp[3] = {4.0, 1.3, 1.3};   
 float Ki[3] = {0.00, 0.00, 0.00}; 
-float Kd[3] = {0, .2, .2};   
+float Kd[3] = {0, 18, 18};
 
 //set point, errore, errore differenziale, errore integrale (Yaw, Pitch, Roll)
 int set_point[3]  = {0, 0, 0};
@@ -216,94 +213,9 @@ float soft_mag_main[3] = {0, 0, 0};
 //
 //|||||||||||||||||||||||||||||||||||||||||||||||||   MAIN   |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 //_______________________________________________________________________________________________________________________________________
-// template <typename T>
-// void debug_print(T t) 
-// {
-//     std::cout << t << std::endl ;
-// }
-
-// template<typename T, typename... Args>
-// void debug_print(T t, Args... args) // recursive variadic function
-// {
-//     std::cout << t <<std::endl ;
-
-//     debug_print(args...) ;
-// }
-
-
-//
-
-// #include <iostream>
-// #include <cmath>
-
-// Costanti per il filtro complementare
-// const float alpha = 0.98;  // Peso per l'accelerometro e il magnetometro
-// const float beta = 0.02;   // Peso per il giroscopio
-
-// Struttura per i dati del sensore
-// struct SensorData {
-//     float accelX, accelY, accelZ;
-//     float gyroX, gyroY, gyroZ;
-//     float magX, magY, magZ;
-// };
-
-// // Funzione per calcolare l'orientamento utilizzando il filtro complementare
-// void calculateOrientation(const SensorData& sensorData, float& roll, float& pitch, float& yaw) {
-//     // Calcola l'accelerazione totale
-//     float accelMagnitude = sqrt(sensorData.accelX * sensorData.accelX +
-//                                sensorData.accelY * sensorData.accelY +
-//                                sensorData.accelZ * sensorData.accelZ);
-
-//     // Normalizza l'accelerazione
-//     float accelXNorm = sensorData.accelX / accelMagnitude;
-//     float accelYNorm = sensorData.accelY / accelMagnitude;
-//     float accelZNorm = sensorData.accelZ / accelMagnitude;
-
-//     // Calcola l'angolo di roll e pitch utilizzando l'accelerometro
-//     roll = atan2(accelYNorm, accelZNorm);
-//     pitch = atan2(-accelXNorm, sqrt(accelYNorm * accelYNorm + accelZNorm * accelZNorm));
-
-//     // Correggi l'effetto del giroscopio
-//     roll = alpha * roll + beta * sensorData.gyroX;
-//     pitch = alpha * pitch + beta * sensorData.gyroY;
-
-//     // Calcola l'angolo di yaw utilizzando il magnetometro
-//     float magHeading = atan2(sensorData.magY, sensorData.magX);
-//     if (magHeading < 0) {
-//         magHeading += 2 * PI;  // Porta l'angolo nell'intervallo [0, 2*pi)
-//     }
-
-//     // Combinazione di roll, pitch e magnetometro per stimare l'orientamento finale
-//     yaw = alpha * magHeading + beta * sensorData.gyroZ;
-// }
-
-// int main() {
-//     // Esempio di dati del sensore (da sostituire con i dati reali del tuo sensore)
-//     SensorData sensorData;
-//     sensorData.accelX = 0.1;
-//     sensorData.accelY = 0.2;
-//     sensorData.accelZ = 9.8;
-//     sensorData.gyroX = 0.01;
-//     sensorData.gyroY = 0.02;
-//     sensorData.gyroZ = 0.03;
-//     sensorData.magX = 30.0;  // Sostituisci con i dati reali del magnetometro
-//     sensorData.magY = 40.0;
-//     sensorData.magZ = 50.0;
-
-//     // Calcola l'orientamento utilizzando il filtro complementare
-//     float roll, pitch, yaw;
-//     calculateOrientation(sensorData, roll, pitch, yaw);
-
-//     // Stampa i risultati
-//     std::cout << "Roll: " << roll << " radians" << std::endl;
-//     std::cout << "Pitch: " << pitch << " radians" << std::endl;
-//     std::cout << "Yaw: " << yaw << " radians" << std::endl;
-
-//     return 0;
-// }
-
-
-//
+void print_float(float x){
+    printf();
+}
 
 void provaRadiocomando(){
     int read_throttle = 0;
@@ -323,16 +235,12 @@ void provaRadiocomando(){
         read_throttle = channel3.read();
 
         DEBUG_PRINT("%d, %d, %d, %d\n",set_point[0], set_point[1], read_throttle, set_point[2]);
-        // DEBUG_PRINT(set_point[0]);
-        // DEBUG_PRINT(set_point[1]);
-        // DEBUG_PRINT(read_throttle);
-        // DEBUG_PRINTLN(set_point[2]);
 
         CycleEnd = CycleTimer.elapsed_time().count();
-        if (CycleTime < 20000) { //Questo è fisso a 50Hz
-            wait_us(int(20000 - CycleTime));
+        if (CycleTime < PERIOD) { //Fixed at 50Hz
+            wait_us(int(PERIOD - CycleTime));
         } else 
-            wait_us(20000-CycleTime);
+            wait_us(PERIOD-CycleTime);
         CycleTimer.reset();
     }
     return;
@@ -372,21 +280,20 @@ void provaMotori(){
             //4 seconds of test
             for(int i = 0;i<80;i++) {
                 CycleTimer.start();
-                CycleBegin = CycleTimer.elapsed_time().count(); //Secondo me questo è sempre zero
+                ///TODO: PROBABLY REMOVE THIS v
+                CycleBegin = CycleTimer.elapsed_time().count();
 
                 ESC1.pulsewidth_us(power[0]);
                 ESC2.pulsewidth_us(power[1]);
                 ESC3.pulsewidth_us(power[2]);
                 ESC4.pulsewidth_us(power[3]);
 
-                //CycleEnd = duration_cast<std::chrono::microseconds>(CycleTimer.elapsed_time()).count();
-                //CycleTime = CycleEnd - CycleBegin;
                 CycleTime = CycleTimer.elapsed_time().count();
 
-                if (CycleTime < 20000) { //Questo è fisso a 50Hz
-                    wait_us(int(20000 - CycleTime));
+                if (CycleTime < PERIOD) {
+                    wait_us(int(PERIOD - CycleTime));
                 } else 
-                    wait_us(20000-CycleTime);
+                    wait_us(PERIOD-CycleTime);
                 CycleTimer.reset();
             }
         }
@@ -429,7 +336,6 @@ void provaSensori(){
         raw_gyr[0] -= offset_gyr_main[0];
         raw_gyr[1] -= offset_gyr_main[1];
         raw_gyr[2] -= offset_gyr_main[2];
-        // DEBUG_PRINT("raw_gyr[Z]: %hd\n",raw_gyr[Z]);
 
         // get angle aproximation by accelerometer vector
         acc_angle[PITCH]    = -atan2(  raw_acc[X],  sqrtf( raw_acc[Y] * raw_acc[Y]  +  raw_acc[Z] * raw_acc[Z] )  ) ;
@@ -501,7 +407,7 @@ void provaSensori(){
 
         new_ang_estim[Z] += tot_gyr_angle[Z]*cos(totalrollf/FILTERING_ORDER) - tot_gyr_angle[Y]*sin(totalrollf/FILTERING_ORDER);
         //  +
-        DEBUG_PRINT("yaw estimation: %d\n",int(new_ang_estim[Z]));
+        // DEBUG_PRINT("yaw estimation: %d\n",int(new_ang_estim[Z]));
 
 
         tot_gyr_angle[Y] = 0.;
@@ -517,17 +423,11 @@ void provaSensori(){
 
         totalpitch /= (FILTERING_ORDER*64);
         totalroll /= (FILTERING_ORDER*64);
-        total_yaw /= (FILTERING_ORDER*64);
-        // DEBUG_PRINT("old angle estimation:%d\n\n",totalroll);
-        // my_yaw_guess /= (64*FILTERING_ORDER*8);
-        // my_other_yaw_guess = 0;
 
-        // DEBUG_PRINT("Rollio: %d\nBeccheggio: %d\nImbardata: %ld\n",totalroll, totalpitch, my_yaw_guess/(64*FILTERING_ORDER*8));
-        // DEBUG_PRINT("guess: %ld\nother_guess: %d\n\n",my_yaw_guess,int(my_other_yaw_guess));
+        DEBUG_PRINT("Rollio: %d\nBeccheggio: %d\nImbardata: %d\n",totalroll, totalpitch, int(new_ang_estim[Z]));
 
         totalpitch = 0;
         totalroll = 0;
-        total_yaw = 0;
 
         totalpitchf = 0.;
         totalrollf  = 0.;
@@ -542,213 +442,6 @@ void provaSensori(){
             wait_us(int(PERIOD - CycleEnd));
         } else 
             printf("!!!WARNING!!! Selected frequency is too high for the device to work properly!\n");
-        CycleTimer.reset();
-    }
-    return;
-}
-
-void provaSensori2(){
-    int totalpitch = 0;
-    int totalroll = 0;
-    int total_yaw = 0;
-    short counter = 0;
-    int my_yaw_guess = 0;
-    float my_deltayaw_guess = 0.;
-    //10 seconds of test
-    for(int k = 0;k>-1;k++) {
-        CycleTimer.start();
-
-        readAccelData(raw_acc);
-        readGyroData(raw_gyr);
-        // if (counter == 0) {
-            // readMagData_calibr(raw_mag, hard_mag_main, soft_mag_main);
-        // }
-        // readMagData_calibr(raw_mag); //same of readMagData(raw_mag) with in-flight autocalibration added
-
-        // DEBUG_PRINT("raw_mag: %hd, %hd, %hd\n",raw_mag[0],raw_mag[1],raw_mag[2]);
-
-
-        // Accelerometer offset correction
-        // If the starting position of the MPU-9150 is horizontal,
-        // the expected values for X and Y acceleration are zero, 
-        // while the expected value for Z acceleration is g.
-        raw_acc[0] -= offset_acc_main[0];
-        raw_acc[1] -= offset_acc_main[1];
-        raw_acc[2] -= offset_acc_main[2];
-
-        // Gyroscope offset correction
-        raw_gyr[0] -= offset_gyr_main[0];
-        raw_gyr[1] -= offset_gyr_main[1];
-        raw_gyr[2] -= offset_gyr_main[2];
-
-        // Magnetometer hard and soft iron correction
-        //Per il momento ignoriamo la bussola
-        
-        raw_mag[0] = (raw_mag[0] - hard_mag_main[0]) / soft_mag_main[0];      // per correggere l'errore si è sviluppato il modello
-        raw_mag[1] = (raw_mag[1] - hard_mag_main[1]) / soft_mag_main[1];      // X_rilevato = X_offset + alpha * x_corretto
-        raw_mag[2] = (raw_mag[2] - hard_mag_main[2]) / soft_mag_main[1];      // per risolvere soft iron si normalizza a 100
-
-
-        // DEBUG_PRINT("raw_mag_BIS: %hd, %hd, %hd\n",raw_mag[0],raw_mag[1],raw_mag[2]);
-        // correct axsis orientation of magnetometer (magnetometer and accelerometer don't share same axis)
-        mag_str[0] =  raw_mag[1];
-        mag_str[1] = -raw_mag[0];
-        mag_str[2] =  raw_mag[2];
-
-        // get angle aproximation by accelerometer vector
-        acc_angle[PITCH]    = -atan2(  raw_acc[X],  sqrtf( raw_acc[Y] * raw_acc[Y]  +  raw_acc[Z] * raw_acc[Z] )  ) ;
-        acc_angle[ROLL]     = -atan2(  raw_acc[Y],  sqrtf( raw_acc[X] * raw_acc[X]  +  raw_acc[Z] * raw_acc[Z] )  ) ;
-        //raw_acc[X] <= offset_acc_main[Z] ? acc_angle[PITCH] = asin(raw_acc[X]/offset_acc_main[Z]) : acc_angle[PITCH] = PI/2;
-        //raw_acc[Y] <= offset_acc_main[Z] ? acc_angle[ROLL] = asin(raw_acc[Y]/offset_acc_main[Z]) : acc_angle[ROLL] = PI/2;
-        //printf("%d, %d, %d\n",raw_acc[X],raw_acc[Y],raw_acc[Z]);
-        //raw_acc[X] <= 16384 ? acc_angle[PITCH] = asin(raw_acc[X]/16384.) : acc_angle[PITCH] = PI/2;
-        //raw_acc[Y] <= 16384 ? acc_angle[ROLL] = asin(raw_acc[Y]/16384.) : acc_angle[ROLL] = PI/2;
-        // acc_angle[PITCH] = atan2(raw_acc[X],raw_acc[Z]);
-        // acc_angle[ROLL] = atan2(raw_acc[Y],raw_acc[Z]);
-
-        // get angle aproximation by angular speed integration (degrees to radiant (0.0174533)) (GSCF (65.5))
-        gyr_delta[0] = ( raw_gyr[0] / FREQ / GSCF) * DEG2RAD;
-        gyr_delta[1] = ( raw_gyr[1] / FREQ / GSCF) * DEG2RAD;
-        gyr_delta[2] = ( raw_gyr[2] / FREQ / GSCF);// * DEG2RAD;
-
-        rotation.fromRPY(gyr_delta[0], gyr_delta[2]*DEG2RAD, gyr_delta[1]);
-        frontPosition = rotation.invert()*frontPosition*rotation;
-        sidePosition = rotation.invert()*sidePosition*rotation;
-
-        // DEBUG_PRINT("100 mapped in 0.%d, 0.%d, 0.%d\n",int(frontPosition.q1*1000),int(frontPosition.q2*1000),int(frontPosition.q3*1000));
-        // gyr_angle[PITCH]   += ( raw_gyr[PITCH] / FREQ / GSCF) * DEG2RAD;
-        gyr_angle[PITCH]   += gyr_delta[PITCH];
-        // gyr_angle[X]   += (-raw_gyr[X] / FREQ / GSCF) * DEG2RAD; //This seems to be on the roll plane
-        gyr_angle[X]   += gyr_delta[X];
-        // gyr_angle[Z]   += (raw_gyr[Z] / FREQ / GSCF) * DEG2RAD;
-        //  gyr_angle[Z]   += (raw_gyr[Z] / FREQ / GSCF);
-        gyr_angle[Z]   += gyr_delta[Z];
-        my_deltayaw_guess += gyr_delta[Z]/(cos(pitch)*cos(roll));       
-
-        // DEBUG_PRINT("gyr_angle for yaw: %d\n",int(gyr_angle[Z]*RAD2DEG));
-        
-        //printf("%d    %d\n", int(gyr_angle[X]*1000), int(acc_angle[ROLL]*1000));
-
-        // compensate gyro angle with accelerometer angle in a complementary filter (accelerometer -> LF ; gyroscope -> HF)
-        gyr_angle[Y]    = gyr_angle[Y] * alpha + acc_angle[PITCH] * (1-alpha);
-        gyr_angle[X]    = gyr_angle[X] * alpha + acc_angle[ROLL] * (1-alpha);
-
-        //test print of this estimation
-        // DEBUG_PRINT("gyr_angle(roll): %d    acc_angle(roll): %d\n", int(gyr_angle[X]*1000), int(acc_angle[ROLL]*1000));
-        //printf("%d\n", int(gyr_angle[X]*1000));
-
-        // compensate yawing motion in angle estimation
-        gyr_angle[Y]   += gyr_angle[X] * sin( ( raw_gyr[Z] / FREQ / GSCF) * DEG2RAD );
-        gyr_angle[X]   -= gyr_angle[Y] * sin( ( raw_gyr[Z] / FREQ / GSCF) * DEG2RAD );
-
-        // get pitch and roll (low pass complementary filter)
-        pitch  = pitch * beta + gyr_angle[Y] * (1-beta);
-        roll   = roll  * beta + gyr_angle[X] * (1-beta);
-
-        // DEBUG_PRINT("100x roll  %d\n",int(roll*100));
-
-        //printf("gyr_angle(roll): %d    acc_angle(roll): %d\n", int(gyr_angle[X]*1000), int(acc_angle[ROLL]*1000));
-
-        // get yaw estimation by magnetometer 
-        mag[0] = mag_str[0] * cos(pitch) + mag_str[1] * sin(roll) * sin(pitch) - mag_str[2] * cos(roll) * sin(pitch);
-        mag[1] = mag_str[1] * cos(roll)  + mag_str[2] * sin(roll);
-
-        yaw    = atan2(mag[1], mag[0]) ;
-        
-        // scaling float values to int -> PI = 180Â° = 8192
-        // good sensitivity and range 
-        angle[YAW]   = yaw   *INT_SCAL;//( ( raw_gyr[Z] / FREQ / GSCF) * DEG2RAD )*INT_SCAL;
-        // total_yaw += angle[YAW];
-        //angle[PITCH] = pitch *INT_SCAL;
-        //angle[ROLL]  = roll  *INT_SCAL;
-        totalpitch += int(pitch *RAD2DEG*64);
-        totalroll  += int(roll  *RAD2DEG*64);
-        total_yaw += int(gyr_angle[Z]*64);
-        my_yaw_guess += int(my_deltayaw_guess*64);
-
-        // DEBUG_PRINT("totalroll: %d\n",totalroll);
-
-        // hard to use directly the yaw angle to correct the drift
-        // alternative: get the yaw anglular speed from a filtered compass which is driftless but noisy
-        // and implementing another complementary filter: LP from compass and HP from gyroscope
-        // In this way we obtain the asymptotic behavior to the compass angle
-
-        // TO BE CORRECTED
-        // previous angle should be filtered like current angle //I cannot understand what this means.
-        // I actually see do not see any kind of filtering on current yaw measure.
-        
-        if (angle[YAW] > 8192 && previous_yaw < -8192) {
-            delta_yaw = (angle[YAW] - previous_yaw - 8192);
-        } else if(angle[YAW]< -8192 && previous_yaw> 8192) {
-            delta_yaw = (angle[YAW] - previous_yaw + 8192);
-        } else {
-            delta_yaw = (previous_yaw - angle[YAW]);
-        }
-        
-        delta_yaw = (previous_yaw - angle[YAW]);
-        if (delta_yaw > 1024) // example: 8190 - (-8190) = 16380
-            delta_yaw = 16384 - delta_yaw; // 16384 - 16380 = 4
-        else if (delta_yaw < -1024) //example: -8190 - 8190 = -16380
-            delta_yaw = -16384 - delta_yaw; // - 16384 - (-16380) = -4 This way, delta_yaw should always stay around zero
-        
-        previous_yaw = angle[YAW];
-
-        /*
-        Nota: secondo me, per calcolare adeguatamente l'imbardata media è il caso di fare così:
-        Se i campioni della media sono tutti superiori a 360°, li sovrascriviamo come se fossero nei pressi dello zero
-        Stesso discorso per angoli negativi molto grandi. 
-        Che va anche bene forse, ma come la mettiamo per il giroscopio?
-        */
-
-        //NOTA: Siccome ho deciso di implementare un altro modo, questo lo commento
-        //average_yaw = fiforeg.FifoReg_shift_and_m_av(delta_yaw);
-        //NOTA: Questo calcola la media sugli ultimi 8 valori:
-        FifoRegNew[fifoRegIndex] = delta_yaw;
-        average_delta_yaw = 0.;
-        bool yaw_wrapup = false; //For yaw angles of more than 360 or less than -360 degrees.
-        for (int i = 0;i < 8; i++) {
-            average_delta_yaw += FifoRegNew[i];
-            // total_yaw += angle[YAW];
-        }
-        average_delta_yaw /= 8;
-        fifoRegIndex++;
-        fifoRegIndex = fifoRegIndex % 8;
-
-        //complementary filter
-        //NOTA: Questo pare dare una posizione angolare, più che una velocità
-        //ang_speed[YAW] = (gamma) * average_delta_yaw + (1 - gamma) * ( ( raw_gyr[Z] / FREQ / GSCF) * DEG2RAD )*INT_SCAL;
-        //Noi vogliamo una velocità angolare:
-        ang_speed[YAW] = (gamma) * average_delta_yaw + (1 - gamma) * ( ( raw_gyr[Z] / FREQ / GSCF) * DEG2RAD )*INT_SCAL;
-        //printf("%d\n",int(ang_speed[YAW]));
-
-        if (++counter < FILTERING_ORDER) {
-            continue;
-        }
-
-        // DEBUG_PRINT("totalroll after continue: %d\n",totalroll);
-        
-        totalpitch /= (FILTERING_ORDER*64);
-        totalroll /= (FILTERING_ORDER*64);
-        total_yaw /= (FILTERING_ORDER*64);
-
-        //velocità angolare sull'imbardata, da accelerometro, bussola e filtro.
-        //printf("%d, %d, %d\n",int(average_delta_yaw*1024),int(( ( raw_gyr[Z] / FREQ / GSCF) * DEG2RAD )*INT_SCAL*1024),int(ang_speed[YAW]*1024));
-        //beccheggio, rollio, imbardata data dalla bussola.
-        //printf("%d, %d, %d\n",totalpitch, totalroll, total_yaw);
-
-        //DEBUG_PRINT("Rollio: %d\nBeccheggio: %d\nImbardata: %d\n\n",totalroll, totalpitch, total_yaw);
-        DEBUG_PRINT("yaw_guess: %d\n", my_yaw_guess/(FILTERING_ORDER*64));
-        totalpitch = 0;
-        totalroll = 0;
-        total_yaw = 0;
-        my_yaw_guess = 0;
-        counter = 0;
-
-        CycleEnd = CycleTimer.elapsed_time().count();
-        if (CycleTime < 20000) { //Questo è fisso a 50Hz
-            wait_us(int(20000 - CycleTime));
-        } else 
-            wait_us(20000-CycleTime);
         CycleTimer.reset();
     }
     return;
