@@ -305,6 +305,7 @@ void provaMotori(){
 
 void provaSensori(){
     float tot_gyr_angle[3] = {0., 0., 0.};
+    float purely_gyroscopic_angle_est[2] = {0., 0.};
     double totalpitchf = 0.;
     double totalrollf = 0.;
     double totalyawf = 0.;
@@ -341,6 +342,11 @@ void provaSensori(){
         gyr_angle[X]   += (-raw_gyr[X] * gyroscope_conversion_constant) * DEG2RAD;
         gyr_angle[Z]   += ( raw_gyr[Z] * gyroscope_conversion_constant); //DEGREES
 
+        //To show estimation based on gyroscope only
+        purely_gyroscopic_angle_est[X]   -= raw_gyr[X] * gyroscope_conversion_constant; //DEGREES
+        purely_gyroscopic_angle_est[Y]   += raw_gyr[Y] * gyroscope_conversion_constant; //DEGREES
+
+        //For YAW estimation
         tot_gyr_angle[Y]   += ( raw_gyr[Y] * gyroscope_conversion_constant); //DEGREES
         tot_gyr_angle[Z]   += ( raw_gyr[Z] * gyroscope_conversion_constant); //DEGREES
 
@@ -349,8 +355,11 @@ void provaSensori(){
         gyr_angle[X]    = gyr_angle[X] * alpha + acc_angle[ROLL] * (1-alpha);
 
         // compensate yawing motion in angle estimation
-        gyr_angle[Y]   += gyr_angle[X] * sin( raw_gyr[Z] * gyroscope_conversion_constant * DEG2RAD );
-        gyr_angle[X]   -= gyr_angle[Y] * sin( raw_gyr[Z] * gyroscope_conversion_constant * DEG2RAD );
+        gyr_angle[Y]   += gyr_angle[X] * sin( raw_gyr[Z] * gyroscope_conversion_constant * DEG2RAD ); //DEGREES
+        gyr_angle[X]   -= gyr_angle[Y] * sin( raw_gyr[Z] * gyroscope_conversion_constant * DEG2RAD ); //DEGREES
+
+        purely_gyroscopic_angle_est[X]   -= purely_gyroscopic_angle_est[Y] * sin( raw_gyr[Z] * gyroscope_conversion_constant * DEG2RAD );
+        purely_gyroscopic_angle_est[Y]   += purely_gyroscopic_angle_est[X] * sin( raw_gyr[Z] * gyroscope_conversion_constant * DEG2RAD );
 
         // get pitch and roll (low pass complementary filter)
         pitch  = pitch * beta + gyr_angle[Y] * (1-beta);
@@ -373,7 +382,9 @@ void provaSensori(){
         tot_gyr_angle[Y] = 0.;
         tot_gyr_angle[Z] = 0.;
 
-        DEBUG_PRINT("Rollio: %d\nBeccheggio: %d\nImbardata: %d\n",int(totalrollf), int(totalpitchf), int(totalyawf));
+        DEBUG_PRINT("FILTERED ESTIMATION\nPITCH: %d\nROLL: %d\nYAW: %d\n\n",int(totalpitchf), int(totalrollf), int(totalyawf));
+        DEBUG_PRINT("PURE GYRO INTEGRATION\nPITCH: %d\nROLL: %d\n\n",int(purely_gyroscopic_angle_est[Y]),int(purely_gyroscopic_angle_est[X]));
+        DEBUG_PRINT("PURE ACCELEROMETER ESTIMATION\nPITCH: %d\nROLL: %d\n\n",int(acc_angle[PITCH]),int(acc_angle[ROLL]));
 
         totalpitchf = 0.;
         totalrollf  = 0.;
