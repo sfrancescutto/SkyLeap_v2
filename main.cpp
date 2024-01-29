@@ -305,8 +305,6 @@ void provaMotori(){
 
 void provaSensori(){
     float tot_gyr_angle[3] = {0., 0., 0.};
-    // int totalpitch = 0;
-    // int totalroll = 0;
     double totalpitchf = 0.;
     double totalrollf = 0.;
     double totalyawf = 0.;
@@ -345,7 +343,6 @@ void provaSensori(){
 
         tot_gyr_angle[Y]   += ( raw_gyr[Y] * gyroscope_conversion_constant); //DEGREES
         tot_gyr_angle[Z]   += ( raw_gyr[Z] * gyroscope_conversion_constant); //DEGREES
-        // DEBUG_PRINT("gyr_angle[Z]: %d\n",int(gyr_angle[Z]));
 
         // compensate gyro angle with accelerometer angle in a complementary filter (accelerometer -> LF ; gyroscope -> HF)
         gyr_angle[Y]    = gyr_angle[Y] * alpha + acc_angle[PITCH] * (1-alpha);
@@ -358,11 +355,6 @@ void provaSensori(){
         // get pitch and roll (low pass complementary filter)
         pitch  = pitch * beta + gyr_angle[Y] * (1-beta);
         roll   = roll  * beta + gyr_angle[X] * (1-beta);
-        
-        // scaling float values to int -> PI = 180Â° = 8192
-        // good sensitivity and range 
-        // totalpitch += int(pitch * RAD2DEG*64);
-        // totalroll  += int(roll  * RAD2DEG*64);
                 
         totalpitchf += pitch;
         totalrollf  += roll;
@@ -381,14 +373,7 @@ void provaSensori(){
         tot_gyr_angle[Y] = 0.;
         tot_gyr_angle[Z] = 0.;
 
-        // totalpitch /= (FILTERING_ORDER*64);
-        // totalroll /= (FILTERING_ORDER*64);
-
-        // DEBUG_PRINT("Rollio: %d\nBeccheggio: %d\nImbardata: %d\n",totalroll, totalpitch, int(totalyawf));
         DEBUG_PRINT("Rollio: %d\nBeccheggio: %d\nImbardata: %d\n",int(totalrollf), int(totalpitchf), int(totalyawf));
-
-        // totalpitch = 0;
-        // totalroll = 0;
 
         totalpitchf = 0.;
         totalrollf  = 0.;
