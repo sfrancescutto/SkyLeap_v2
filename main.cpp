@@ -108,6 +108,9 @@ and could lead to bad error estimation due to wrong integration and derivation f
 #define Y           1     // Y axis
 #define Z           2     // Z axis
 
+#define PERIODS_IN_10_SECONDS 10000000/PERIOD
+#define PERIODS_IN_4_SECONDS  4000000/PERIOD
+
 ///USAGE: Same as printf -> DEBUGPRINT("%d, %d\n",N,M);
 #define DEBUG
 
@@ -220,7 +223,7 @@ float soft_mag_main[3] = {0, 0, 0};
 void provaRadiocomando(){
     int read_throttle = 0;
     //10 seconds of test
-    for(int i = 0;i<200;i++) {
+    for(int i = 0;i<PERIODS_IN_10_SECONDS;i++) {
         CycleTimer.start();
 
         channel1.calibrate();
@@ -278,7 +281,7 @@ void provaMotori(){
             printf("Invio al motore %d la potenza di %d/2000...\n",motore ,power[motore]);
 
             //4 seconds of test
-            for(int i = 0;i<80;i++) {
+            for(int i = 0;i<PERIODS_IN_4_SECONDS;i++) {
                 CycleTimer.start();
                 ///TODO: PROBABLY REMOVE THIS v
                 CycleBegin = CycleTimer.elapsed_time().count();
