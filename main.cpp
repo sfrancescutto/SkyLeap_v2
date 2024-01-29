@@ -527,6 +527,7 @@ int main()
     power[2] = 1000;
     power[3] = 1000;
     if (serialCom) {printf("START \n\n");}
+    //Remove comment to allow runtime selection of proportional contant for PID filter.
     /*
     printf("Inserisci i valori di Kp:\n");
     scanf("%f",&Kp[0]);
@@ -538,11 +539,10 @@ int main()
     
     int mode = 0;
     do {
-    printf("1 --> Prova Radiocomando\n2 --> Prova Motori\n3 --> Prova Sensori\naltro --> Avvio normale\n");
-    // scanf("%d",&mode);
-    mode = 3;
+    printf("1 --> Prova Radiocomando\n2 --> Prova Motori\n3 --> Prova Sensori\n9 --> Avvio normale\n");
+    scanf("%d",&mode);
     switch(mode) {
-        case 0: 
+        case 9: 
             printf("Avvio normale...\n");
             break;
         case 1: 
@@ -561,7 +561,7 @@ int main()
             printf("Invalid mode, please try again.\n");
             break;
     }
-    } while (mode != 0);
+    } while (mode != 9);
 
 //_______________________________________________________________________________________________________________________________________
 //
