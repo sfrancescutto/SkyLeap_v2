@@ -382,6 +382,11 @@ void provaSensori(){
         // totalrollf  /= FILTERING_ORDER;
 
         totalyawf += tot_gyr_angle[Z]*cos(totalrollf/FILTERING_ORDER) - tot_gyr_angle[Y]*sin(totalrollf/FILTERING_ORDER);
+        if (totalyawf > 360) {
+            totalyawf -= 360;
+        } else if (totalyawf < -360) {
+            totalyawf += 360;
+        }
 
         tot_gyr_angle[Y] = 0.;
         tot_gyr_angle[Z] = 0.;
@@ -721,13 +726,29 @@ int main()
         set_point[1]  = (channel2.read() - 500) * 1.82;
         set_point[2]  = (channel4.read() - 500) * 1.82;
 
+        // NEEDS TO BE TESTED!
+        // totalpitchf /= FILTERING_ORDER;
+        // totalrollf /= FILTERING_ORDER;
+        // IF ^ WORKS, down here we can remove the /FILTERING_ORDER
         totalyawf += tot_gyr_angle[Z]*cos(totalrollf/FILTERING_ORDER) - tot_gyr_angle[Y]*sin(totalrollf/FILTERING_ORDER);
+        
+        // Please note that the following can also be done with % operator
+        // but also note that that would require totalyawf to be integer. 
+        if (totalyawf > 360) {
+            totalyawf -= 360;
+        } else if (totalyawf < -360) {
+            totalyawf += 360;
+        }
 
         tot_gyr_angle[Y] = 0.;
         tot_gyr_angle[Z] = 0.;
 
         totalpitch /= FILTERING_ORDER;
         totalroll /= FILTERING_ORDER;
+
+        ///IMPORTANT:
+        //Please, note that the following has to be carefully 
+        //corrected, to allow the drone to follow the yaw set point as desired
 
         //new error
         new_e[YAW]   = ang_speed[YAW]   - set_point[YAW];
