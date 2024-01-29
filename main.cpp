@@ -213,9 +213,9 @@ float soft_mag_main[3] = {0, 0, 0};
 //
 //|||||||||||||||||||||||||||||||||||||||||||||||||   MAIN   |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 //_______________________________________________________________________________________________________________________________________
-void print_float(float x){
-    printf();
-}
+// void print_float(float x){
+//     printf();
+// }
 
 void provaRadiocomando(){
     int read_throttle = 0;
@@ -229,9 +229,9 @@ void provaRadiocomando(){
         channel4.calibrate();
 
         //set point: pid objective ( * 1.82 = max 10Â°)
-        set_point[0]  = (channel1.read() - 500) * 1.82;
-        set_point[1]  = (channel2.read() - 500) * 1.82;
-        set_point[2]  = (channel4.read() - 500) * 1.82;
+        set_point[0]  = channel1.read() - 500;
+        set_point[1]  = channel2.read() - 500;
+        set_point[2]  = channel4.read() - 500;
         read_throttle = channel3.read();
 
         DEBUG_PRINT("%d, %d, %d, %d\n",set_point[0], set_point[1], read_throttle, set_point[2]);
@@ -301,20 +301,14 @@ void provaMotori(){
 }
 
 void provaSensori(){
-    float avg_acc_angle[3] = {0., 0., 0.};
     float tot_gyr_angle[3] = {0., 0., 0.};
-    float new_ang_estim[3] = {0., 0., 0.};
-    int totalpitch = 0;
-    int totalroll = 0;
+    // int totalpitch = 0;
+    // int totalroll = 0;
     double totalpitchf = 0.;
     double totalrollf = 0.;
-    double totaldeltayaw = 0.;
-    int total_yaw = 0;
+    double totalyawf = 0.;
+
     short counter = 0;
-    long my_yaw_guess = 0;
-    double my_other_yaw_guess = 0.;
-    double my_deltayaw_guess = 0.;
-    double my_pitch_gyr_angle = 0.;
 
     double gyroscope_conversion_constant = 1/(FREQ*GSCF);
 
@@ -341,18 +335,10 @@ void provaSensori(){
         acc_angle[PITCH]    = -atan2(  raw_acc[X],  sqrtf( raw_acc[Y] * raw_acc[Y]  +  raw_acc[Z] * raw_acc[Z] )  ) ;
         acc_angle[ROLL]     = -atan2(  raw_acc[Y],  sqrtf( raw_acc[X] * raw_acc[X]  +  raw_acc[Z] * raw_acc[Z] )  ) ;
 
-        //NEW APPROACH
-        avg_acc_angle[PITCH] += -atan2( raw_acc[X],  sqrtf( raw_acc[Y] * raw_acc[Y]  +  raw_acc[Z] * raw_acc[Z] ) ) ;
-        avg_acc_angle[ROLL]  += -atan2( raw_acc[Y],  sqrtf( raw_acc[X] * raw_acc[X]  +  raw_acc[Z] * raw_acc[Z] ) ) ;
-
         // get angle aproximation by angular speed integration (degrees to radiant (0.0174533)) (GSCF (65.5))
-        gyr_angle[Y]   += ( raw_gyr[Y] / FREQ / GSCF) * DEG2RAD;
-        gyr_angle[X]   += (-raw_gyr[X] / FREQ / GSCF) * DEG2RAD;
-        gyr_angle[Z]   += (raw_gyr[Z] / FREQ / GSCF);
-
-        new_ang_estim[Y]   += raw_gyr[Y] * gyroscope_conversion_constant * DEG2RAD;
-        //NOTE: we use -= instead of += because the positive sign of our frame is opposite to the positive sign of the gyroscope.
-        new_ang_estim[X]   -= raw_gyr[X] * gyroscope_conversion_constant * DEG2RAD;
+        gyr_angle[Y]   += ( raw_gyr[Y] * gyroscope_conversion_constant) * DEG2RAD;
+        gyr_angle[X]   += (-raw_gyr[X] * gyroscope_conversion_constant) * DEG2RAD;
+        gyr_angle[Z]   += ( raw_gyr[Z] * gyroscope_conversion_constant); //DEGREES
 
         tot_gyr_angle[Y]   += ( raw_gyr[Y] * gyroscope_conversion_constant); //DEGREES
         tot_gyr_angle[Z]   += ( raw_gyr[Z] * gyroscope_conversion_constant); //DEGREES
@@ -363,11 +349,8 @@ void provaSensori(){
         gyr_angle[X]    = gyr_angle[X] * alpha + acc_angle[ROLL] * (1-alpha);
 
         // compensate yawing motion in angle estimation
-        gyr_angle[Y]   += gyr_angle[X] * sin( ( raw_gyr[Z] / FREQ / GSCF) * DEG2RAD );
-        gyr_angle[X]   -= gyr_angle[Y] * sin( ( raw_gyr[Z] / FREQ / GSCF) * DEG2RAD );
-
-        new_ang_estim[Y]   += gyr_angle[X] * sin( raw_gyr[Z] * gyroscope_conversion_constant * DEG2RAD );
-        new_ang_estim[X]   -= gyr_angle[Y] * sin( raw_gyr[Z] * gyroscope_conversion_constant * DEG2RAD );
+        gyr_angle[Y]   += gyr_angle[X] * sin( raw_gyr[Z] * gyroscope_conversion_constant * DEG2RAD );
+        gyr_angle[X]   -= gyr_angle[Y] * sin( raw_gyr[Z] * gyroscope_conversion_constant * DEG2RAD );
 
         // get pitch and roll (low pass complementary filter)
         pitch  = pitch * beta + gyr_angle[Y] * (1-beta);
@@ -375,16 +358,11 @@ void provaSensori(){
         
         // scaling float values to int -> PI = 180Â° = 8192
         // good sensitivity and range 
-        totalpitch += int(pitch *RAD2DEG*64);
-        totalroll  += int(roll  *RAD2DEG*64);
+        // totalpitch += int(pitch * RAD2DEG*64);
+        // totalroll  += int(roll  * RAD2DEG*64);
                 
         totalpitchf += pitch;
         totalrollf  += roll;
-        totaldeltayaw += raw_gyr[Z] * gyroscope_conversion_constant; //DEGREES!
-        // DEBUG_PRINT("TotalDeltaYaw: %d\n",int(totaldeltayaw));
-        total_yaw += int(gyr_angle[Z]*64);
-        my_deltayaw_guess += (raw_gyr[Z] / FREQ / GSCF); //degrees!
-        my_pitch_gyr_angle += (raw_gyr[Y] / FREQ /GSCF);
 
         if (++counter < FILTERING_ORDER) {
             CycleEnd = CycleTimer.elapsed_time().count();
@@ -395,46 +373,23 @@ void provaSensori(){
             continue;
         }
 
-        avg_acc_angle[0] /=4;
-        avg_acc_angle[1] /=4;
-
-        new_ang_estim[Y] = new_ang_estim[Y] * alpha + avg_acc_angle[PITCH] * (1-alpha);
-        new_ang_estim[X] = new_ang_estim[X] * alpha + avg_acc_angle[ROLL] * (1-alpha);
-
-        // new_ang_estim[Z] += tot_gyr_angle[Y]*sin(new_ang_estim[X]) + tot_gyr_angle[Z]*cos(new_ang_estim[X]);
-
-        // DEBUG_PRINT("new_angle_estimation: %d\n",int(totalrollf/FILTERING_ORDER*RAD2DEG));
-
-        new_ang_estim[Z] += tot_gyr_angle[Z]*cos(totalrollf/FILTERING_ORDER) - tot_gyr_angle[Y]*sin(totalrollf/FILTERING_ORDER);
-        //  +
-        // DEBUG_PRINT("yaw estimation: %d\n",int(new_ang_estim[Z]));
-
+        totalyawf += tot_gyr_angle[Z]*cos(totalrollf/FILTERING_ORDER) - tot_gyr_angle[Y]*sin(totalrollf/FILTERING_ORDER);
 
         tot_gyr_angle[Y] = 0.;
         tot_gyr_angle[Z] = 0.;
 
-        double cos_pitch = cos(totalpitchf/FILTERING_ORDER);
-        double sin_pitch = sin(totalpitchf/FILTERING_ORDER);
-        double cos_roll = 1;//cos(totalrollf/FILTERING_ORDER);
+        // totalpitch /= (FILTERING_ORDER*64);
+        // totalroll /= (FILTERING_ORDER*64);
 
-        my_yaw_guess += long((totaldeltayaw/(cos(totalpitchf/FILTERING_ORDER)*cos(totalrollf/FILTERING_ORDER)))*64);
-        my_yaw_guess += long((totaldeltayaw/(cos_pitch*cos_roll))*64);
-        my_other_yaw_guess += totaldeltayaw*cos_pitch + my_pitch_gyr_angle*sin_pitch;
+        // DEBUG_PRINT("Rollio: %d\nBeccheggio: %d\nImbardata: %d\n",totalroll, totalpitch, int(totalyawf));
+        DEBUG_PRINT("Rollio: %d\nBeccheggio: %d\nImbardata: %d\n",int(totalrollf), int(totalpitchf), int(totalyawf));
 
-        totalpitch /= (FILTERING_ORDER*64);
-        totalroll /= (FILTERING_ORDER*64);
-
-        DEBUG_PRINT("Rollio: %d\nBeccheggio: %d\nImbardata: %d\n",totalroll, totalpitch, int(new_ang_estim[Z]));
-
-        totalpitch = 0;
-        totalroll = 0;
+        // totalpitch = 0;
+        // totalroll = 0;
 
         totalpitchf = 0.;
         totalrollf  = 0.;
-        totaldeltayaw = 0.;
-        my_pitch_gyr_angle = 0.;
 
-        my_deltayaw_guess = 0;
         counter = 0;
 
         CycleEnd = CycleTimer.elapsed_time().count();
