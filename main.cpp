@@ -88,7 +88,7 @@ and could lead to bad error estimation due to wrong integration and derivation f
 #include "Quaternion.hpp"
 
 #define PI          3.14159265
-#define FILTERING_ORDER 4
+#define FILTERING_ORDER 2
 #define FREQ        50.0*FILTERING_ORDER  //Hz    Change this value to change the frequency of the cycle  //NOTA VA VERIFICATO SE IL TELECONMANDO FUNZIONA ANCORA BENE
 #define PERIOD      20000 //microseconds
 #define PERIOD2     PERIOD/FILTERING_ORDER
@@ -216,10 +216,6 @@ float soft_mag_main[3] = {0, 0, 0};
 //
 //|||||||||||||||||||||||||||||||||||||||||||||||||   MAIN   |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 //_______________________________________________________________________________________________________________________________________
-// void print_float(float x){
-//     printf();
-// }
-
 void provaRadiocomando(){
     int read_throttle = 0;
     //10 seconds of test
@@ -378,8 +374,8 @@ void provaSensori(){
         }
 
         ///TODO: TEST THIS! 
-        // totalpitchf /= FILTERING_ORDER;
-        // totalrollf  /= FILTERING_ORDER;
+        totalpitchf /= FILTERING_ORDER;
+        totalrollf  /= FILTERING_ORDER;
 
         totalyawf += tot_gyr_angle[Z]*cos(totalrollf/FILTERING_ORDER) - tot_gyr_angle[Y]*sin(totalrollf/FILTERING_ORDER);
         if (totalyawf > 360) {
@@ -391,9 +387,9 @@ void provaSensori(){
         tot_gyr_angle[Y] = 0.;
         tot_gyr_angle[Z] = 0.;
 
-        DEBUG_PRINT("FILTERED ESTIMATION\nPITCH: %d\nROLL: %d\nYAW: %d\n\n",int(totalpitchf), int(totalrollf), int(totalyawf));
-        DEBUG_PRINT("PURE GYRO INTEGRATION\nPITCH: %d\nROLL: %d\n\n",int(purely_gyroscopic_angle_est[Y]),int(purely_gyroscopic_angle_est[X]));
-        DEBUG_PRINT("PURE ACCELEROMETER ESTIMATION\nPITCH: %d\nROLL: %d\n\n",int(acc_angle[PITCH]),int(acc_angle[ROLL]));
+        DEBUG_PRINT("FILT:\nP: %d\nR: %d\nY: %d\n\n",int(totalpitchf*RAD2DEG), int(totalrollf*RAD2DEG), int(totalyawf));
+        DEBUG_PRINT("GYR:\nP: %d\nR: %d\n\n",int(purely_gyroscopic_angle_est[Y]),int(purely_gyroscopic_angle_est[X]));
+        DEBUG_PRINT("ACC:\nP: %d\nR: %d\n\n",int(acc_angle[PITCH]*RAD2DEG),int(acc_angle[ROLL]*RAD2DEG));
 
         totalpitchf = 0.;
         totalrollf  = 0.;
