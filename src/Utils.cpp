@@ -117,12 +117,6 @@ int CycleTime;
 
 //Serial port
 bool serialCom;
-// static BufferedSerial serial_port(USBTX, USBRX, 115200);
-
-// FileHandle *mbed::mbed_override_console(int fd)
-// {
-//     return &serial_port;
-// }
 
 float test_mag[3] = {0, 0, 0};
 int offset_acc_main[3] = {0, 0, 0};
@@ -489,7 +483,6 @@ void main_loop(){
 
     float const gyroscope_conversion_constant = 1/(FREQ*GSCF);
     int read_throttle = 0;
-/* */
 
     CycleTimer.start();
     while(true) {   
