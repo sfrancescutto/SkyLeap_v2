@@ -48,8 +48,8 @@ float   beta  = 0.5;        //second complementary filter parameter
 float   gamma = 0;          //yaw speed complementary filter parameter //NOTA: ERA 0.7
 float   mag_str[3];         //intermediate variable of magnetic field
 float   mag[3];             //magnetometer componets on earth system
-float tot_gyr_angle[3] = {0., 0., 0.};
-float purely_gyroscopic_angle_est[2] = {0., 0.};
+float   tot_gyr_angle[3] = {0., 0., 0.};
+float   purely_gyroscopic_angle_est[2] = {0., 0.};
 float   pitch,roll,yaw;     //necessary for integration
 float   totalpitchf, totalrollf, totalyawf; //final extimation of pitch roll and yaw (basically filtered pitch/roll/yaw)
 
@@ -345,7 +345,7 @@ void readSensors(){
         totalpitchf += pitch;
         totalrollf  += roll;
 
-        if (++counter < FILTERING_ORDER) {
+        if (++ counter < FILTERING_ORDER) {
             CycleEnd = CycleTimer.elapsed_time().count();
             if (CycleEnd < PERIOD2*counter) {
                 wait_us(int(PERIOD2*counter - CycleEnd));
@@ -367,8 +367,8 @@ void readSensors(){
         tot_gyr_angle[Z] = 0.;
 
         counter = 0;
+        return;
     }
-    return;
 }
 
 ///IMPORTANT:
@@ -520,6 +520,7 @@ void provaSensori(){
         DEBUG_PRINT("ACC:  P: %d\tR: %d\n",int(acc_angle[PITCH]*RAD2DEG),int(acc_angle[ROLL]*RAD2DEG));
 
         CycleEnd = CycleTimer.elapsed_time().count();
+        printf("%d\n",CycleEnd);
         if (CycleEnd < PERIOD) {
             wait_us(int(PERIOD - CycleEnd));
         } else 
