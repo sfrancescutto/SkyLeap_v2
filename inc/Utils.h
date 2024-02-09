@@ -15,9 +15,9 @@
 #define SKYLEAP_UTILS
 void initialize();
 void select_mode();
-void readSensors(float& pitch, float& roll, float& yaw);
-void readRC(int& pitch_setpoint, int& roll_setpoint, int& yawspeed_setpoint, int& throttle);
-void produceESCOutput(const float& pitch, const float& roll, const float& yaw, const int& pitch_setpoint, const int& roll_setpoint, const int& yawspeed_setpoint, const int& throttle);
+void readSensors();
+void readRC();
+void produceESCOutput();
 void provaRadiocomando();
 void provaMotori();
 void provaSensori();

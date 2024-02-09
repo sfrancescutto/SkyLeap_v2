@@ -70,7 +70,12 @@ float Ki[3] = {0.00, 0.00, 0.00};
 float Kd[3] = {0, 18, 18};
 
 //set point, errore, errore differenziale, errore integrale (Yaw, Pitch, Roll)
-int set_point[3]  = {0, 0, 0};
+// int set_point[3]  = {0, 0, 0};
+int pitch_setpoint = 0;
+int roll_setpoint = 0;
+int yawspeed_setpoint = 0;
+int throttle = 0;
+
 int new_e[3]      = {0, 0, 0};
 int prev_e[3]     = {0, 0, 0};
 int delta_e[3]    = {0, 0, 0};
@@ -282,23 +287,27 @@ void select_mode(){
     } while (mode != 9);
 }
 
+void readRC(){
+    channel1.calibrate();
+    channel2.calibrate();
+    channel3.calibrate();
+    channel4.calibrate();
+
+    pitch_setpoint  = channel1.read() - 500;
+    roll_setpoint  = channel2.read() - 500;
+    yawspeed_setpoint  = channel4.read() - 500;
+    throttle = channel3.read();
+}
+
 void provaRadiocomando(){
     int read_throttle = 0;
     //10 seconds of test
     for(int i = 0;i<PERIODS_IN_10_SECONDS;i++) {
         CycleTimer.start();
 
-        channel1.calibrate();
-        channel2.calibrate();
-        channel3.calibrate();
-        channel4.calibrate();
+        readRC();
 
-        set_point[0]  = channel1.read()/5 - 100;
-        set_point[1]  = channel2.read()/5 - 100;
-        set_point[2]  = channel4.read()/5 - 100;
-        read_throttle = channel3.read()/10;
-
-        DEBUG_PRINT("%d,\t%d,\t%d,\t%d\n",set_point[0], set_point[1], read_throttle, set_point[2]);
+        DEBUG_PRINT("%d,\t%d,\t%d,\t%d\n",pitch_setpoint, roll_setpoint, read_throttle, yawspeed_setpoint);
 
         CycleEnd = CycleTimer.elapsed_time().count();
         if (CycleTime < PERIOD) { //Fixed at 50Hz
@@ -612,9 +621,10 @@ void main_loop(){
         channel4.calibrate();
 
         //set point: pid objective ( * 1.82 = max 10Â°)
-        set_point[0]  = (channel1.read() - 500) * 1.82;
-        set_point[1]  = (channel2.read() - 500) * 1.82;
-        set_point[2]  = (channel4.read() - 500) * 1.82;
+        // set_point[0]  = (channel1.read() - 500) * 1.82;
+        // set_point[1]  = (channel2.read() - 500) * 1.82;
+        // yawspeed_setpoint  = (channel4.read() - 500) * 1.82;
+        readRC();
 
         // NEEDS TO BE TESTED!
         // totalpitchf /= FILTERING_ORDER;
@@ -641,11 +651,11 @@ void main_loop(){
         //corrected, to allow the drone to follow the yaw set point as desired
 
         //new error
-        new_e[YAW]   = ang_speed[YAW]   - set_point[YAW];
+        new_e[YAW]   = ang_speed[YAW]   - yawspeed_setpoint;
         //new_e[PITCH] = angle[PITCH]     - set_point[PITCH];
         //new_e[ROLL]  = angle[ROLL]      - set_point[ROLL];
-        new_e[PITCH] = totalpitch     - set_point[PITCH];
-        new_e[ROLL]  = totalroll      - set_point[ROLL];
+        new_e[PITCH] = totalpitch     - pitch_setpoint;
+        new_e[ROLL]  = totalroll      - roll_setpoint;
 
         //integrative factor
         sum_e[YAW]   += new_e[YAW];
