@@ -293,6 +293,92 @@ void readRC(){
     throttle = channel3.read();
 }
 
+void readSensors(){
+    totalpitchf = 0.;
+    totalrollf  = 0.;
+
+    readAccelData(raw_acc);
+    readGyroData(raw_gyr);
+
+    // Accelerometer offset correction
+    // If the starting position of the MPU-9150 is horizontal,
+    // the expected values for X and Y acceleration are zero, 
+    // while the expected value for Z acceleration is g.
+    while (true) {
+        raw_acc[0] -= offset_acc_main[0];
+        raw_acc[1] -= offset_acc_main[1];
+        raw_acc[2] -= offset_acc_main[2];
+
+        // Gyroscope offset correction
+        raw_gyr[0] -= offset_gyr_main[0];
+        raw_gyr[1] -= offset_gyr_main[1];
+        raw_gyr[2] -= offset_gyr_main[2];
+
+        // get angle aproximation by accelerometer vector
+        acc_angle[PITCH]    = -atan2(  raw_acc[X],  sqrtf( raw_acc[Y] * raw_acc[Y]  +  raw_acc[Z] * raw_acc[Z] )  ) ;
+        acc_angle[ROLL]     = -atan2(  raw_acc[Y],  sqrtf( raw_acc[X] * raw_acc[X]  +  raw_acc[Z] * raw_acc[Z] )  ) ;
+
+        // get angle aproximation by angular speed integration (degrees to radiant (0.0174533)) (GSCF (65.5))
+        gyr_angle[Y]   += ( raw_gyr[Y] * gyroscope_conversion_constant) * DEG2RAD;
+        gyr_angle[X]   += (-raw_gyr[X] * gyroscope_conversion_constant) * DEG2RAD;
+        gyr_angle[Z]   += ( raw_gyr[Z] * gyroscope_conversion_constant); //DEGREES
+
+        //To show estimation based on gyroscope only
+        purely_gyroscopic_angle_est[X]   -= raw_gyr[X] * gyroscope_conversion_constant; //DEGREES
+        purely_gyroscopic_angle_est[Y]   += raw_gyr[Y] * gyroscope_conversion_constant; //DEGREES
+
+        //For YAW estimation
+        tot_gyr_angle[Y]   += ( raw_gyr[Y] * gyroscope_conversion_constant); //DEGREES
+        tot_gyr_angle[Z]   += ( raw_gyr[Z] * gyroscope_conversion_constant); //DEGREES
+
+        // compensate gyro angle with accelerometer angle in a complementary filter (accelerometer -> LF ; gyroscope -> HF)
+        gyr_angle[Y]    = gyr_angle[Y] * alpha + acc_angle[PITCH] * (1-alpha);
+        gyr_angle[X]    = gyr_angle[X] * alpha + acc_angle[ROLL] * (1-alpha);
+
+        // compensate yawing motion in angle estimation
+        gyr_angle[Y]   += gyr_angle[X] * sin( raw_gyr[Z] * gyroscope_conversion_constant * DEG2RAD );
+        gyr_angle[X]   -= gyr_angle[Y] * sin( raw_gyr[Z] * gyroscope_conversion_constant * DEG2RAD );
+
+        purely_gyroscopic_angle_est[X]   -= purely_gyroscopic_angle_est[Y] * sin( raw_gyr[Z] * gyroscope_conversion_constant * DEG2RAD ); //DEGREES
+        purely_gyroscopic_angle_est[Y]   += purely_gyroscopic_angle_est[X] * sin( raw_gyr[Z] * gyroscope_conversion_constant * DEG2RAD ); //DEGREES
+
+        // get pitch and roll (low pass complementary filter)
+        pitch  = pitch * beta + gyr_angle[Y] * (1-beta);
+        roll   = roll  * beta + gyr_angle[X] * (1-beta);
+                
+        totalpitchf += pitch;
+        totalrollf  += roll;
+
+        if (++counter < FILTERING_ORDER) {
+            CycleEnd = CycleTimer.elapsed_time().count();
+            if (CycleEnd < PERIOD2*counter) {
+                wait_us(int(PERIOD2*counter - CycleEnd));
+            } else 
+                printf(" !!!WARNING!!! Filtering Order is too high for the device to work properly!\n");
+            continue;
+        }
+
+        totalpitchf /= FILTERING_ORDER;
+        totalrollf  /= FILTERING_ORDER;
+        totalyawf += tot_gyr_angle[Z]*cos(totalrollf/FILTERING_ORDER) - tot_gyr_angle[Y]*sin(totalrollf/FILTERING_ORDER);
+        if (totalyawf > 360) {
+            totalyawf -= 360;
+        } else if (totalyawf < -360) {
+            totalyawf += 360;
+        }
+
+        tot_gyr_angle[Y] = 0.;
+        tot_gyr_angle[Z] = 0.;
+
+        counter = 0;
+    }
+    return;
+}
+
+produceESCOutput(){
+    
+}
+
 void provaRadiocomando(){
     int read_throttle = 0;
     //10 seconds of test
@@ -376,88 +462,12 @@ void provaSensori(){
 
     while(true) {
         CycleTimer.start();
-
-        readAccelData(raw_acc);
-        readGyroData(raw_gyr);
-
-        // Accelerometer offset correction
-        // If the starting position of the MPU-9150 is horizontal,
-        // the expected values for X and Y acceleration are zero, 
-        // while the expected value for Z acceleration is g.
-        raw_acc[0] -= offset_acc_main[0];
-        raw_acc[1] -= offset_acc_main[1];
-        raw_acc[2] -= offset_acc_main[2];
-
-        // Gyroscope offset correction
-        raw_gyr[0] -= offset_gyr_main[0];
-        raw_gyr[1] -= offset_gyr_main[1];
-        raw_gyr[2] -= offset_gyr_main[2];
-
-        // get angle aproximation by accelerometer vector
-        acc_angle[PITCH]    = -atan2(  raw_acc[X],  sqrtf( raw_acc[Y] * raw_acc[Y]  +  raw_acc[Z] * raw_acc[Z] )  ) ;
-        acc_angle[ROLL]     = -atan2(  raw_acc[Y],  sqrtf( raw_acc[X] * raw_acc[X]  +  raw_acc[Z] * raw_acc[Z] )  ) ;
-
-        // get angle aproximation by angular speed integration (degrees to radiant (0.0174533)) (GSCF (65.5))
-        gyr_angle[Y]   += ( raw_gyr[Y] * gyroscope_conversion_constant) * DEG2RAD;
-        gyr_angle[X]   += (-raw_gyr[X] * gyroscope_conversion_constant) * DEG2RAD;
-        gyr_angle[Z]   += ( raw_gyr[Z] * gyroscope_conversion_constant); //DEGREES
-
-        //To show estimation based on gyroscope only
-        purely_gyroscopic_angle_est[X]   -= raw_gyr[X] * gyroscope_conversion_constant; //DEGREES
-        purely_gyroscopic_angle_est[Y]   += raw_gyr[Y] * gyroscope_conversion_constant; //DEGREES
-
-        //For YAW estimation
-        tot_gyr_angle[Y]   += ( raw_gyr[Y] * gyroscope_conversion_constant); //DEGREES
-        tot_gyr_angle[Z]   += ( raw_gyr[Z] * gyroscope_conversion_constant); //DEGREES
-
-        // compensate gyro angle with accelerometer angle in a complementary filter (accelerometer -> LF ; gyroscope -> HF)
-        gyr_angle[Y]    = gyr_angle[Y] * alpha + acc_angle[PITCH] * (1-alpha);
-        gyr_angle[X]    = gyr_angle[X] * alpha + acc_angle[ROLL] * (1-alpha);
-
-        // compensate yawing motion in angle estimation
-        gyr_angle[Y]   += gyr_angle[X] * sin( raw_gyr[Z] * gyroscope_conversion_constant * DEG2RAD );
-        gyr_angle[X]   -= gyr_angle[Y] * sin( raw_gyr[Z] * gyroscope_conversion_constant * DEG2RAD );
-
-        purely_gyroscopic_angle_est[X]   -= purely_gyroscopic_angle_est[Y] * sin( raw_gyr[Z] * gyroscope_conversion_constant * DEG2RAD ); //DEGREES
-        purely_gyroscopic_angle_est[Y]   += purely_gyroscopic_angle_est[X] * sin( raw_gyr[Z] * gyroscope_conversion_constant * DEG2RAD ); //DEGREES
-
-        // get pitch and roll (low pass complementary filter)
-        pitch  = pitch * beta + gyr_angle[Y] * (1-beta);
-        roll   = roll  * beta + gyr_angle[X] * (1-beta);
-                
-        totalpitchf += pitch;
-        totalrollf  += roll;
-
-        if (++counter < FILTERING_ORDER) {
-            CycleEnd = CycleTimer.elapsed_time().count();
-            if (CycleEnd < PERIOD2*counter) {
-                wait_us(int(PERIOD2*counter - CycleEnd));
-            } else 
-                printf(" !!!WARNING!!! Filtering Order is too high for the device to work properly!\n");
-            continue;
-        }
-
-        totalpitchf /= FILTERING_ORDER;
-        totalrollf  /= FILTERING_ORDER;
-
-        totalyawf += tot_gyr_angle[Z]*cos(totalrollf/FILTERING_ORDER) - tot_gyr_angle[Y]*sin(totalrollf/FILTERING_ORDER);
-        if (totalyawf > 360) {
-            totalyawf -= 360;
-        } else if (totalyawf < -360) {
-            totalyawf += 360;
-        }
-
-        tot_gyr_angle[Y] = 0.;
-        tot_gyr_angle[Z] = 0.;
+        
+        readSensors();
 
         DEBUG_PRINT("FILT:P:%d\tR:%d\tY: %d\t\t",int(totalpitchf*RAD2DEG), int(totalrollf*RAD2DEG), int(totalyawf));
         DEBUG_PRINT("GYR: P: %d\tR: %d\t\t",int(purely_gyroscopic_angle_est[Y]),int(purely_gyroscopic_angle_est[X]));
         DEBUG_PRINT("ACC:  P: %d\tR: %d\n",int(acc_angle[PITCH]*RAD2DEG),int(acc_angle[ROLL]*RAD2DEG));
-
-        totalpitchf = 0.;
-        totalrollf  = 0.;
-
-        counter = 0;
 
         CycleEnd = CycleTimer.elapsed_time().count();
         if (CycleEnd < PERIOD) {
@@ -466,7 +476,6 @@ void provaSensori(){
             printf("!!!WARNING!!! Selected frequency is too high for the device to work properly!\n");
         CycleTimer.reset();
     }
-    return;
 }
 
 void main_loop(){
@@ -485,236 +494,86 @@ void main_loop(){
     int read_throttle = 0;
 
     CycleTimer.start();
-    while(true) {   
-        // read raw data from sensors
-        readAccelData(raw_acc);
-        readGyroData(raw_gyr);
 
-        // if(counter == 0)
-        //     readMagData_calibr(raw_mag, hard_mag_main, soft_mag_main); //same of readMagData(raw_mag) with in-flight autocalibration added
+    readSensors();
 
-        // Accelerometer offset correction
-        raw_acc[0] -= offset_acc_main[0];
-        raw_acc[1] -= offset_acc_main[1];
-        raw_acc[2] -= offset_acc_main[2];
 
-        // Gyroscope offset correction
-        raw_gyr[0] -= offset_gyr_main[0];
-        raw_gyr[1] -= offset_gyr_main[1];
-        raw_gyr[2] -= offset_gyr_main[2];
+    //set point: pid objective ( * 1.82 = max 10Â°)
+    // set_point[0]  = (channel1.read() - 500) * 1.82;
+    // set_point[1]  = (channel2.read() - 500) * 1.82;
+    // yawspeed_setpoint  = (channel4.read() - 500) * 1.82;
+    readRC();
 
-        // Magnetometer hard and soft iron correction
-        // Per il momento ignoriamo la bussola
-        // raw_mag[0] = (raw_mag[0] - hard_mag_main[0]) / soft_mag_main[0];      // per correggere l'errore si è sviluppato il modello
-        // raw_mag[1] = (raw_mag[1] - hard_mag_main[1]) / soft_mag_main[1];      // X_rilevato = X_offset + alpha * x_corretto
-        // raw_mag[2] = (raw_mag[2] - hard_mag_main[2]) / soft_mag_main[1];      // per risolvere soft iron si normalizza a 100
-    
-        // correct axsis orientation of magnetometer (magnetometer and accelerometer don't share same axis)
-        // mag_str[0] =  raw_mag[1];
-        // mag_str[1] = -raw_mag[0];
-        // mag_str[2] =  raw_mag[2];
+    tot_gyr_angle[Y] = 0.;
+    tot_gyr_angle[Z] = 0.;
 
-        // get angle aproximation by accelerometer vector
-        acc_angle[Y]    = -atan2(  raw_acc[X],  sqrtf( raw_acc[Y] * raw_acc[Y]  +  raw_acc[Z] * raw_acc[Z] )  ) ;
-        acc_angle[X]    = -atan2(  raw_acc[Y],  sqrtf( raw_acc[X] * raw_acc[X]  +  raw_acc[Z] * raw_acc[Z] )  ) ;
+    ///IMPORTANT:
+    //Please, note that the following has to be carefully 
+    //corrected, to allow the drone to follow the yaw set point as desired
 
-        // get angle aproximation by angular speed integration (degrees to radiant (0.0174533)) (GSCF (65.5))
-        gyr_angle[Y]   += ( raw_gyr[Y] * gyroscope_conversion_constant) * DEG2RAD;
-        gyr_angle[X]   += (-raw_gyr[X] * gyroscope_conversion_constant) * DEG2RAD;
-        gyr_angle[Z]   += ( raw_gyr[Z] * gyroscope_conversion_constant); //DEGREES
+    //new error
+    new_e[YAW]   = ang_speed[YAW]   - yawspeed_setpoint;
+    new_e[PITCH] = totalpitch     - pitch_setpoint;
+    new_e[ROLL]  = totalroll      - roll_setpoint;
 
-        //For YAW estimation
-        tot_gyr_angle[Y]   += ( raw_gyr[Y] * gyroscope_conversion_constant); //DEGREES
-        tot_gyr_angle[Z]   += ( raw_gyr[Z] * gyroscope_conversion_constant); //DEGREES
+    //integrative factor
+    sum_e[YAW]   += new_e[YAW];
+    sum_e[PITCH] += new_e[PITCH];
+    sum_e[ROLL]  += new_e[ROLL];
 
-        // compensate gyro angle with accelerometer angle in a complementary filter (accelerometer -> LF ; gyroscope -> HF)
-        gyr_angle[Y]    = gyr_angle[Y] * alpha + acc_angle[PITCH] * (1-alpha);
-        gyr_angle[X]    = gyr_angle[X] * alpha + acc_angle[ROLL] * (1-alpha);
+    // set maximum and minimum
+    sum_e[YAW]   = cutOff(sum_e[YAW],   -40/Ki[YAW],   40/Ki[YAW]);
+    sum_e[PITCH] = cutOff(sum_e[PITCH], -40/Ki[PITCH], 40/Ki[PITCH]);
+    sum_e[ROLL]  = cutOff(sum_e[ROLL],  -40/Ki[ROLL],  40/Ki[ROLL]);
 
-        // compensate yawing motion in angle estimation
-        gyr_angle[Y]   += gyr_angle[X] * sin( raw_gyr[Z] * gyroscope_conversion_constant * DEG2RAD ); //DEGREES
-        gyr_angle[X]   -= gyr_angle[Y] * sin( raw_gyr[Z] * gyroscope_conversion_constant * DEG2RAD ); //DEGREES
+    //derivative factor
+    delta_e[YAW]   = new_e[YAW]   - prev_e[YAW];
+    delta_e[PITCH] = new_e[PITCH] - prev_e[PITCH];
+    delta_e[ROLL]  = new_e[ROLL]  - prev_e[ROLL];
 
-        // get pitch and roll (low pass complementary filter)
-        pitch  = pitch * beta + gyr_angle[Y] * (1-beta);
-        roll   = roll  * beta + gyr_angle[X] * (1-beta);
+    //update previous error
+    prev_e[YAW]   = new_e[YAW];
+    prev_e[PITCH] = new_e[PITCH];
+    prev_e[ROLL]  = new_e[ROLL];
 
-        totalpitchf += pitch;
-        totalrollf  += roll;
-    
-        // get yaw estimation by magnetometer 
-        // mag[0] = mag_str[0] * cos(pitch) + mag_str[1] * sin(roll) * sin(pitch) - mag_str[2] * cos(roll) * sin(pitch);
-        // mag[1] = mag_str[1] * cos(roll)  + mag_str[2] * sin(roll);
+    //calculate correction 
+    correction[YAW]   = (cutOffInt((new_e[YAW]   * Kp[YAW])   + (sum_e[YAW]   * Ki[YAW])   + (delta_e[YAW]   * Kd[YAW]), -500, +500))*0.12 ;
+    correction[PITCH] = (cutOffInt((new_e[PITCH] * Kp[PITCH]) + (sum_e[PITCH] * Ki[PITCH]) + (delta_e[PITCH] * Kd[PITCH]), -500, +500))*0.12 ;
+    correction[ROLL]  = (cutOffInt((new_e[ROLL]  * Kp[ROLL])  + (sum_e[ROLL]  * Ki[ROLL])  + (delta_e[ROLL]  * Kd[ROLL]), -500, +500))*0.12 ;
 
-        // yaw    = atan2(mag[1], mag[0]) ;
-        
-        // scaling float values to int -> PI = 180Â° = 8192
-        // good sensitivity and range 
-        // angle[YAW]   = yaw   *INT_SCAL;//( ( raw_gyr[Z] / FREQ / GSCF) * DEG2RAD )*INT_SCAL;
-        //angle[PITCH] = pitch *INT_SCAL;
-        //angle[ROLL]  = roll  *INT_SCAL;
-        totalpitch += pitch *INT_SCAL;
-        totalroll  += roll  *INT_SCAL;
+    //THROTTLE POWER CALCULATION
+    read_throttle = channel3.read();
 
-        //printf("\nRollio: %d\nBeccheggio: %d\nImbardata: %d",angle[ROLL], angle[PITCH], angle[YAW]);
-
-        
-        // hard to use directly the yaw angle to correct the drift
-        // alternative: get the yaw anglular speed from a filtered compass which is driftless but noisy
-        // and implementing another complementary filter: LP from compass and HP from gyroscope
-        // In this way we obtain the asymptotic behavior to the compass angle
-
-        // TO BE CORRECTED
-        // previous angle should be filtered like current angle
-        // if (angle[YAW] > 8192 && previous_yaw < -8192) {
-        //     delta_yaw = (angle[YAW] - previous_yaw - 8192);
-        // } else if(angle[YAW]< -8192 && previous_yaw> 8192) {
-        //     delta_yaw = (angle[YAW] - previous_yaw + 8192);
-        // } else {
-        //     delta_yaw = (previous_yaw - angle[YAW]);
-        // }
-        // previous_yaw = angle[YAW];
-
-        /*
-        Nota: secondo me, per calcolare adeguatamente l'imbardata media è il caso di fare così:
-        Se i campioni della media sono tutti superiori a 360°, li sovrascriviamo come se fossero nei pressi dello zero
-        Stesso discorso per angoli negativi molto grandi. 
-        Che va anche bene forse, ma come la mettiamo per il giroscopio?
-        */
-
-        //NOTA: Siccome ho deciso di implementare un altro modo, questo lo commento
-        //average_yaw = fiforeg.FifoReg_shift_and_m_av(delta_yaw);
-        
-        //NOTA: Questo calcola la media sugli ultimi 8 valori:
-        // FifoRegNew[fifoRegIndex] = delta_yaw;
-        // average_delta_yaw = 0.;
-        // for (int i = 0;i < 8; i++)
-        //     average_delta_yaw += FifoRegNew[i];
-        // average_delta_yaw /= 8;
-        // fifoRegIndex++;
-        // fifoRegIndex = fifoRegIndex % 8;
-
-        //complementary filter
-        //NOTA: Questo pare dare una posizione angolare, più che una velocità
-        // ang_speed[YAW] = (gamma) * average_delta_yaw + (1 - gamma) * ( ( raw_gyr[Z] / FREQ / GSCF) * DEG2RAD )*INT_SCAL;
-        
-        if (++counter < FILTERING_ORDER) {
-            CycleEnd = CycleTimer.elapsed_time().count();
-            if (CycleEnd < PERIOD2*counter) {
-                wait_us(int(PERIOD2*counter - CycleEnd));
-            } else 
-                printf(" !!!WARNING!!! Filtering Order is too high for the device to work properly!\n");
-            continue;
-        }
-
-        // use the calibration factor on RF recieved data
-        channel1.calibrate();
-        channel2.calibrate();
-        channel3.calibrate();
-        channel4.calibrate();
-
-        //set point: pid objective ( * 1.82 = max 10Â°)
-        // set_point[0]  = (channel1.read() - 500) * 1.82;
-        // set_point[1]  = (channel2.read() - 500) * 1.82;
-        // yawspeed_setpoint  = (channel4.read() - 500) * 1.82;
-        readRC();
-
-        // NEEDS TO BE TESTED!
-        // totalpitchf /= FILTERING_ORDER;
-        // totalrollf /= FILTERING_ORDER;
-        // IF ^ WORKS, down here we can remove the /FILTERING_ORDER
-        totalyawf += tot_gyr_angle[Z]*cos(totalrollf/FILTERING_ORDER) - tot_gyr_angle[Y]*sin(totalrollf/FILTERING_ORDER);
-        
-        // Please note that the following can also be done with % operator
-        // but also note that that would require totalyawf to be integer. 
-        if (totalyawf > 360) {
-            totalyawf -= 360;
-        } else if (totalyawf < -360) {
-            totalyawf += 360;
-        }
-
-        tot_gyr_angle[Y] = 0.;
-        tot_gyr_angle[Z] = 0.;
-
-        totalpitch /= FILTERING_ORDER;
-        totalroll /= FILTERING_ORDER;
-
-        ///IMPORTANT:
-        //Please, note that the following has to be carefully 
-        //corrected, to allow the drone to follow the yaw set point as desired
-
-        //new error
-        new_e[YAW]   = ang_speed[YAW]   - yawspeed_setpoint;
-        //new_e[PITCH] = angle[PITCH]     - set_point[PITCH];
-        //new_e[ROLL]  = angle[ROLL]      - set_point[ROLL];
-        new_e[PITCH] = totalpitch     - pitch_setpoint;
-        new_e[ROLL]  = totalroll      - roll_setpoint;
-
-        //integrative factor
-        sum_e[YAW]   += new_e[YAW];
-        sum_e[PITCH] += new_e[PITCH];
-        sum_e[ROLL]  += new_e[ROLL];
-
-        // set maximum and minimum
-        sum_e[YAW]   = cutOff(sum_e[YAW],   -40/Ki[YAW],   40/Ki[YAW]);
-        sum_e[PITCH] = cutOff(sum_e[PITCH], -40/Ki[PITCH], 40/Ki[PITCH]);
-        sum_e[ROLL]  = cutOff(sum_e[ROLL],  -40/Ki[ROLL],  40/Ki[ROLL]);
-
-        //derivative factor
-        delta_e[YAW]   = new_e[YAW]   - prev_e[YAW];
-        delta_e[PITCH] = new_e[PITCH] - prev_e[PITCH];
-        delta_e[ROLL]  = new_e[ROLL]  - prev_e[ROLL];
-
-        //update previous error
-        prev_e[YAW]   = new_e[YAW];
-        prev_e[PITCH] = new_e[PITCH];
-        prev_e[ROLL]  = new_e[ROLL];
-
-        //calculate correction 
-        correction[YAW]   = (cutOffInt((new_e[YAW]   * Kp[YAW])   + (sum_e[YAW]   * Ki[YAW])   + (delta_e[YAW]   * Kd[YAW]), -500, +500))*0.12 ;
-        correction[PITCH] = (cutOffInt((new_e[PITCH] * Kp[PITCH]) + (sum_e[PITCH] * Ki[PITCH]) + (delta_e[PITCH] * Kd[PITCH]), -500, +500))*0.12 ;
-        correction[ROLL]  = (cutOffInt((new_e[ROLL]  * Kp[ROLL])  + (sum_e[ROLL]  * Ki[ROLL])  + (delta_e[ROLL]  * Kd[ROLL]), -500, +500))*0.12 ;
-
-        //THROTTLE POWER CALCULATION
-        read_throttle = channel3.read();
-
-       //NOTA che secondo me va ancora appurato che questo sia un modo furbo di proseguire. Io penso che preferirei ragionare con qualcosa di più strettamente legato al motore
-       if (read_throttle>50){
-            power[0] = 1190 + read_throttle + correction[ROLL] + correction[PITCH] + correction[YAW];
-            power[1] = 1055 + read_throttle - correction[ROLL] + correction[PITCH] - correction[YAW];
-            power[2] = 1050 + read_throttle + correction[ROLL] - correction[PITCH] - correction[YAW];
-            power[3] = 1168 + read_throttle - correction[ROLL] - correction[PITCH] + correction[YAW];
-        } else {
-            power[0] = 1000;
-            power[1] = 1000;
-            power[2] = 1000;
-            power[3] = 1000;
-        }
-
-        //ESC OUTPUT        
-        ESC1.pulsewidth_us(power[0]);
-        ESC2.pulsewidth_us(power[1]);
-        ESC3.pulsewidth_us(power[2]);
-        ESC4.pulsewidth_us(power[3]);
-        
-        // Green Led Running program (toggle every 100 cycles)
-        // CycleCounter++;
-        // if (CycleCounter==100) { CycleCounter=0; on_off(2); }
-
-        // Every Cycle should be 20ms long: match 50Hz frequency by waiting excess time
-        CycleEnd = duration_cast<std::chrono::microseconds>(CycleTimer.elapsed_time()).count();
-        if (CycleEnd < PERIOD) {
-            wait_us(int(PERIOD - CycleTime));
-        } else {
-            printf("!!! WARNING !!!\nWORKING FREQUENCY IS TOO HIGH, SYSTEM MAY NOT WORK CORRECTLY\n"); //DEBUG oppure no, non lo so
-        }
-        totalpitch = 0;
-        totalroll = 0;
-        
-        totalpitchf = 0.;
-        totalrollf  = 0.;
-
-        counter = 0;
-        CycleTimer.reset(); //reset does NOT stop the timer, it just resets its counter to zero.
+    //NOTA che secondo me va ancora appurato che questo sia un modo furbo di proseguire. Io penso che preferirei ragionare con qualcosa di più strettamente legato al motore
+    if (read_throttle>50){
+        power[0] = 1190 + read_throttle + correction[ROLL] + correction[PITCH] + correction[YAW];
+        power[1] = 1055 + read_throttle - correction[ROLL] + correction[PITCH] - correction[YAW];
+        power[2] = 1050 + read_throttle + correction[ROLL] - correction[PITCH] - correction[YAW];
+        power[3] = 1168 + read_throttle - correction[ROLL] - correction[PITCH] + correction[YAW];
+    } else {
+        power[0] = 1000;
+        power[1] = 1000;
+        power[2] = 1000;
+        power[3] = 1000;
     }
+
+    //ESC OUTPUT        
+    ESC1.pulsewidth_us(power[0]);
+    ESC2.pulsewidth_us(power[1]);
+    ESC3.pulsewidth_us(power[2]);
+    ESC4.pulsewidth_us(power[3]);
+    
+    Green Led Running program (toggle every 100 cycles)
+    CycleCounter++;
+    if (CycleCounter==100) { CycleCounter=0; on_off(2); }
+
+    // Every Cycle should be 20ms long: match 50Hz frequency by waiting excess time
+    CycleEnd = duration_cast<std::chrono::microseconds>(CycleTimer.elapsed_time()).count();
+    if (CycleEnd < PERIOD) {
+        wait_us(int(PERIOD - CycleTime));
+    } else {
+        printf("!!! WARNING !!!\nWORKING FREQUENCY IS TOO HIGH, SYSTEM MAY NOT WORK CORRECTLY\n"); //DEBUG oppure no, non lo so
+    }
+
+    CycleTimer.reset(); //reset does NOT stop the timer, it just resets its counter to zero.
 }
