@@ -32,6 +32,7 @@ public:
     void find_interval();
     void calculate_calibration();
     void channel_default_value(int default_offset, float default_factor);
+    void reset_timer();
 
     /*
         read operation require the application of offset and scaling factor:

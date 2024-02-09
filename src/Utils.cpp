@@ -273,7 +273,7 @@ void select_mode(){
     } while (mode != 9);
 }
 
-///Creates (and saves as global variables) value read from the RC
+///Measures (and saves as global variables) value read the RC
 ///This values stand between -500 and 500, with the exception of the throttle that goes from 0 to 1000.
 void readRC(){
     channel1.calibrate();
@@ -285,6 +285,12 @@ void readRC(){
     roll_setpoint  = channel2.read() - 500;
     yawspeed_setpoint  = channel4.read() - 500;
     throttle = channel3.read();
+
+    //reset timers:
+    channel1.reset_timer();
+    channel2.reset_timer();
+    channel3.reset_timer();
+    channel4.reset_timer();
 }
 
 void readSensors(){
@@ -440,14 +446,13 @@ void produceESCOutput(){
 }
 
 void provaRadiocomando(){
-    int read_throttle = 0;
     //10 seconds of test
     for(int i = 0;i<PERIODS_IN_10_SECONDS;i++) {
         CycleTimer.start();
 
         readRC();
 
-        DEBUG_PRINT("%d,\t%d,\t%d,\t%d\n",pitch_setpoint, roll_setpoint, read_throttle, yawspeed_setpoint);
+        DEBUG_PRINT("%d,\t%d,\t%d,\t%d\n", pitch_setpoint, roll_setpoint, throttle, yawspeed_setpoint);
 
         CycleEnd = CycleTimer.elapsed_time().count();
         if (CycleTime < PERIOD) { //Fixed at 50Hz

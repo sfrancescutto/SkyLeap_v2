@@ -24,7 +24,11 @@ void Channel::stop() {                           //IRS: stop the timer
     timer.stop();
     // time  = timer.read_us()-1000;       //return time -1000
     time = timer.elapsed_time().count() - 1000;
-    // timer.reset();                      //reset timer
+    timer.reset();                      //reset timer
+}
+
+void Channel::reset_timer() {
+    //timer.reset();
 }
 
 void Channel::find_interval(){     //this function verify if value exceed border
@@ -83,16 +87,7 @@ int Channel::calibrate_read() {
 
 int Channel::read() { 
     return calibrated;
-    
-    //if (last_values[0] < last_values[1] && last_values[0] > last_values[2] || last_values[0] > last_values[1] && last_values[0] < last_values[2])
-    //    return last_values[0];
-    //if (last_values[1] < last_values[0] && last_values[1] > last_values[2] || last_values[1] > last_values[0] && last_values[1] < last_values[2])
-    //    return last_values[1];
-    //return last_values[2];
-    if (last_values[0] < last_values[1])
-        return last_values[0];
-    return last_values[1];
-    }       //read data
+}
 
 
 // ----------- PRINT ---------------------
