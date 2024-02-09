@@ -1,7 +1,7 @@
 #include"Utils.h"
 
 #define PI          3.14159265
-#define FILTERING_ORDER 2
+#define FILTERING_ORDER 2   //Can also be set up to 4 without (or with less) debug prints
 #define FREQ        50.0*FILTERING_ORDER  //Hz    Change this value to change the frequency of the cycle  //NOTA VA VERIFICATO SE IL TELECONMANDO FUNZIONA ANCORA BENE
 #define PERIOD      20000 //microseconds
 #define PERIOD2     PERIOD/FILTERING_ORDER
@@ -43,16 +43,16 @@ int16_t raw_mag[3];
 //elaborated data
 float   acc_angle[3];       //angle estimation from acc
 float   gyr_angle[3];       //angle estimation from acc
-float gyr_delta[3];
 float   alpha = 0.02;        //first complementary filter parameter
 float   beta  = 0.5;        //second complementary filter parameter
 float   gamma = 0;          //yaw speed complementary filter parameter //NOTA: ERA 0.7
 float   mag_str[3];         //intermediate variable of magnetic field
 float   mag[3];             //magnetometer componets on earth system
-float   pitch,roll,yaw;     //final extimeted pitch roll and yaw
-int     counter = 0;        //counter
+float tot_gyr_angle[3] = {0., 0., 0.};
+float purely_gyroscopic_angle_est[2] = {0., 0.};
+float   pitch,roll,yaw;     //necessary for integration
+float   totalpitchf, totalrollf, totalyawf; //final extimation of pitch roll and yaw (basically filtered pitch/roll/yaw)
 
-int angle[3];
 int previous_yaw;
 int delta_yaw;
 float   ang_speed[3];       //velocitÃ  angolari
@@ -63,12 +63,6 @@ int FifoRegNew[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 short int fifoRegIndex = 0;
 float average_delta_yaw;
 
-//PID coefficients (Yaw, Pitch, Roll)
-///NOTE: THEY NEED TO BE TUNED 
-float Kp[3] = {4.0, 1.3, 1.3};   
-float Ki[3] = {0.00, 0.00, 0.00}; 
-float Kd[3] = {0, 18, 18};
-
 //set point, errore, errore differenziale, errore integrale (Yaw, Pitch, Roll)
 // int set_point[3]  = {0, 0, 0};
 int pitch_setpoint = 0;
@@ -76,12 +70,9 @@ int roll_setpoint = 0;
 int yawspeed_setpoint = 0;
 int throttle = 0;
 
-int new_e[3]      = {0, 0, 0};
-int prev_e[3]     = {0, 0, 0};
-int delta_e[3]    = {0, 0, 0};
 long sum_e[3]     = {0, 0, 0};
-int correction[3] = {0, 0, 0};
 
+//A shy try, not very useful tho
 Quaternion frontPosition(0.,1.,0.,0.);
 Quaternion sidePosition(0.,0.,1.,0.);
 Quaternion rotation;
@@ -111,8 +102,8 @@ DigitalIn SW5(PTC8,  PullUp);
 
 //Cycle Timer
 Timer CycleTimer;
-long CycleBegin, CycleEnd;
-int CycleCounter=0;
+short CycleCounter;
+long CycleEnd;
 int CycleTime;
 
 //Serial port
@@ -123,6 +114,7 @@ int offset_acc_main[3] = {0, 0, 0};
 int offset_gyr_main[3] = {0, 0, 0};
 int hard_mag_main[3] = {0, 0, 0};
 float soft_mag_main[3] = {0, 0, 0};
+const float gyroscope_conversion_constant = 1/(FREQ*GSCF);
 
 void initialize(){
     signal_start();//SOUND AND LIGHT EFFECT
@@ -281,6 +273,8 @@ void select_mode(){
     } while (mode != 9);
 }
 
+///Creates (and saves as global variables) value read from the RC
+///This values stand between -500 and 500, with the exception of the throttle that goes from 0 to 1000.
 void readRC(){
     channel1.calibrate();
     channel2.calibrate();
@@ -294,6 +288,8 @@ void readRC(){
 }
 
 void readSensors(){
+    short counter = 0;
+
     totalpitchf = 0.;
     totalrollf  = 0.;
 
@@ -375,8 +371,72 @@ void readSensors(){
     return;
 }
 
-produceESCOutput(){
-    
+///IMPORTANT:
+///Please, note that the following has to be carefully 
+///corrected, to allow the drone to follow the yaw set point as desired
+///This functions should just do all the calculations necessary to provide the correct value to the ESCs.
+///Since most of the involved variables are global, there's nothing to pass, of course it doesn't return anything.
+void produceESCOutput(){
+    //PID coefficients (Yaw, Pitch, Roll)
+    ///NOTE: THEY NEED TO BE TUNED 
+    const float Kp[3] = {4.0, 1.3, 1.3};   
+    const float Ki[3] = {0.00, 0.00, 0.00}; 
+    const float Kd[3] = {0, 18, 18};
+
+    int new_e[3]      = {0, 0, 0};
+    int prev_e[3]     = {0, 0, 0};
+    int delta_e[3]    = {0, 0, 0};
+    int correction[3] = {0, 0, 0};
+
+    //new error
+    new_e[YAW]   = ang_speed[YAW]   - yawspeed_setpoint;
+    new_e[PITCH] = totalpitchf     - pitch_setpoint;
+    new_e[ROLL]  = totalrollf      - roll_setpoint;
+
+    //integrative factor
+    sum_e[YAW]   += new_e[YAW];
+    sum_e[PITCH] += new_e[PITCH];
+    sum_e[ROLL]  += new_e[ROLL];
+
+    // set maximum and minimum
+    sum_e[YAW]   = cutOff(sum_e[YAW],   -40/Ki[YAW],   40/Ki[YAW]);
+    sum_e[PITCH] = cutOff(sum_e[PITCH], -40/Ki[PITCH], 40/Ki[PITCH]);
+    sum_e[ROLL]  = cutOff(sum_e[ROLL],  -40/Ki[ROLL],  40/Ki[ROLL]);
+
+    //derivative factor
+    delta_e[YAW]   = new_e[YAW]   - prev_e[YAW];
+    delta_e[PITCH] = new_e[PITCH] - prev_e[PITCH];
+    delta_e[ROLL]  = new_e[ROLL]  - prev_e[ROLL];
+
+    //update previous error
+    prev_e[YAW]   = new_e[YAW];
+    prev_e[PITCH] = new_e[PITCH];
+    prev_e[ROLL]  = new_e[ROLL];
+
+    //calculate correction 
+    correction[YAW]   = (cutOffInt((new_e[YAW]   * Kp[YAW])   + (sum_e[YAW]   * Ki[YAW])   + (delta_e[YAW]   * Kd[YAW]), -500, +500))*0.12 ;
+    correction[PITCH] = (cutOffInt((new_e[PITCH] * Kp[PITCH]) + (sum_e[PITCH] * Ki[PITCH]) + (delta_e[PITCH] * Kd[PITCH]), -500, +500))*0.12 ;
+    correction[ROLL]  = (cutOffInt((new_e[ROLL]  * Kp[ROLL])  + (sum_e[ROLL]  * Ki[ROLL])  + (delta_e[ROLL]  * Kd[ROLL]), -500, +500))*0.12 ;
+
+    //NOTA che secondo me va ancora appurato che questo sia un modo furbo di proseguire. Io penso che preferirei ragionare con qualcosa di più strettamente legato al motore
+    if (throttle>50){
+        power[0] = 1190 + throttle + correction[ROLL] + correction[PITCH] + correction[YAW];
+        power[1] = 1055 + throttle - correction[ROLL] + correction[PITCH] - correction[YAW];
+        power[2] = 1050 + throttle + correction[ROLL] - correction[PITCH] - correction[YAW];
+        power[3] = 1168 + throttle - correction[ROLL] - correction[PITCH] + correction[YAW];
+    } else {
+        power[0] = 1000;
+        power[1] = 1000;
+        power[2] = 1000;
+        power[3] = 1000;
+    }
+
+    //ESC OUTPUT        
+    ESC1.pulsewidth_us(power[0]);
+    ESC2.pulsewidth_us(power[1]);
+    ESC3.pulsewidth_us(power[2]);
+    ESC4.pulsewidth_us(power[3]);
+
 }
 
 void provaRadiocomando(){
@@ -450,16 +510,6 @@ void provaMotori(){
 }
 
 void provaSensori(){
-    float tot_gyr_angle[3] = {0., 0., 0.};
-    float purely_gyroscopic_angle_est[2] = {0., 0.};
-    float totalpitchf = 0.;
-    float totalrollf = 0.;
-    float totalyawf = 0.;
-
-    short counter = 0;
-
-    float gyroscope_conversion_constant = 1/(FREQ*GSCF);
-
     while(true) {
         CycleTimer.start();
         
@@ -504,66 +554,9 @@ void main_loop(){
     // yawspeed_setpoint  = (channel4.read() - 500) * 1.82;
     readRC();
 
-    tot_gyr_angle[Y] = 0.;
-    tot_gyr_angle[Z] = 0.;
-
-    ///IMPORTANT:
-    //Please, note that the following has to be carefully 
-    //corrected, to allow the drone to follow the yaw set point as desired
-
-    //new error
-    new_e[YAW]   = ang_speed[YAW]   - yawspeed_setpoint;
-    new_e[PITCH] = totalpitch     - pitch_setpoint;
-    new_e[ROLL]  = totalroll      - roll_setpoint;
-
-    //integrative factor
-    sum_e[YAW]   += new_e[YAW];
-    sum_e[PITCH] += new_e[PITCH];
-    sum_e[ROLL]  += new_e[ROLL];
-
-    // set maximum and minimum
-    sum_e[YAW]   = cutOff(sum_e[YAW],   -40/Ki[YAW],   40/Ki[YAW]);
-    sum_e[PITCH] = cutOff(sum_e[PITCH], -40/Ki[PITCH], 40/Ki[PITCH]);
-    sum_e[ROLL]  = cutOff(sum_e[ROLL],  -40/Ki[ROLL],  40/Ki[ROLL]);
-
-    //derivative factor
-    delta_e[YAW]   = new_e[YAW]   - prev_e[YAW];
-    delta_e[PITCH] = new_e[PITCH] - prev_e[PITCH];
-    delta_e[ROLL]  = new_e[ROLL]  - prev_e[ROLL];
-
-    //update previous error
-    prev_e[YAW]   = new_e[YAW];
-    prev_e[PITCH] = new_e[PITCH];
-    prev_e[ROLL]  = new_e[ROLL];
-
-    //calculate correction 
-    correction[YAW]   = (cutOffInt((new_e[YAW]   * Kp[YAW])   + (sum_e[YAW]   * Ki[YAW])   + (delta_e[YAW]   * Kd[YAW]), -500, +500))*0.12 ;
-    correction[PITCH] = (cutOffInt((new_e[PITCH] * Kp[PITCH]) + (sum_e[PITCH] * Ki[PITCH]) + (delta_e[PITCH] * Kd[PITCH]), -500, +500))*0.12 ;
-    correction[ROLL]  = (cutOffInt((new_e[ROLL]  * Kp[ROLL])  + (sum_e[ROLL]  * Ki[ROLL])  + (delta_e[ROLL]  * Kd[ROLL]), -500, +500))*0.12 ;
-
-    //THROTTLE POWER CALCULATION
-    read_throttle = channel3.read();
-
-    //NOTA che secondo me va ancora appurato che questo sia un modo furbo di proseguire. Io penso che preferirei ragionare con qualcosa di più strettamente legato al motore
-    if (read_throttle>50){
-        power[0] = 1190 + read_throttle + correction[ROLL] + correction[PITCH] + correction[YAW];
-        power[1] = 1055 + read_throttle - correction[ROLL] + correction[PITCH] - correction[YAW];
-        power[2] = 1050 + read_throttle + correction[ROLL] - correction[PITCH] - correction[YAW];
-        power[3] = 1168 + read_throttle - correction[ROLL] - correction[PITCH] + correction[YAW];
-    } else {
-        power[0] = 1000;
-        power[1] = 1000;
-        power[2] = 1000;
-        power[3] = 1000;
-    }
-
-    //ESC OUTPUT        
-    ESC1.pulsewidth_us(power[0]);
-    ESC2.pulsewidth_us(power[1]);
-    ESC3.pulsewidth_us(power[2]);
-    ESC4.pulsewidth_us(power[3]);
+    produceESCOutput();
     
-    Green Led Running program (toggle every 100 cycles)
+    // Green Led Running program (toggle every 100 cycles)
     CycleCounter++;
     if (CycleCounter==100) { CycleCounter=0; on_off(2); }
 
