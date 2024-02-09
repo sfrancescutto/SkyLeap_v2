@@ -293,6 +293,11 @@ void readRC(){
     channel4.reset_timer();
 }
 
+///Reads Y, P, R sensors and puts the values, measured in DEGREES, into
+///the global variables totalpitchf, totalrollf and totalyawf
+///Yaw resets to 0 at +-360°. It grows moving counterclockwise (on the compass: NWSE)
+///Pitch is negative when the nose of the aircraft is pointing down (positive when it points up)
+///Roll is negative when left wing is under right wing, positive when right wing is under left wing
 void readSensors(){
     short counter = 0;
 

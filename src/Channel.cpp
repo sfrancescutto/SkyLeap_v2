@@ -5,8 +5,6 @@
 
 Channel::Channel(PinName pin, int num) : interrupt(pin) {    //constructor
     this->number=num;
-    //interrupt.rise(&Channel::start);
-    //interrupt.fall(&Channel::stop);
     interrupt.rise([this](){start();}); //I use lambda functions as KSC doesn't seem to like the previous expression
     interrupt.fall([this](){stop();});
 
@@ -22,7 +20,6 @@ void Channel::start() {
 
 void Channel::stop() {                           //IRS: stop the timer
     timer.stop();
-    // time  = timer.read_us()-1000;       //return time -1000
     time = timer.elapsed_time().count() - 1000;
     timer.reset();                      //reset timer
 }
@@ -63,27 +60,7 @@ void Channel::calibrate() {
         if (calibrated<0) {
         calibrated=0;
         } 
-        // else
-        //if (calibrated<510 && calibrated>490){ calibrated=500; } //?  //Pare che una banda morta migliori le prestazioni...
-    // last_values[i] = calibrated;
-    // i = ++i%2;
-    //if (calibrated<515 && calibrated>485){ calibrated=500; } //?  //Pare che una banda morta migliori le prestazioni...
 }
-
-/*
-int Channel::calibrate_read() { 
-    calibrated = (time-offset)*factor;
-    if (calibrated>1000) {
-        return 1000;
-        } 
-    if (calibrated<0) {
-        return 0;
-    }
-    if (calibrated<515 && calibrated>485){ 
-        return 500; 
-    }
-    return calibrated;
-}*/
 
 int Channel::read() { 
     return calibrated;
