@@ -91,11 +91,6 @@ and could lead to bad error estimation due to wrong integration and derivation f
 // bool serialCom;
 static BufferedSerial serial_port(USBTX, USBRX, 115200);
 
-FileHandle *mbed::mbed_override_console(int fd)
-{
-    return &serial_port;
-}
-
 int main() 
 {   
     initialize();

@@ -43,7 +43,7 @@ int16_t raw_mag[3];
 //elaborated data
 float   acc_angle[3];       //angle estimation from acc
 float   gyr_angle[3];       //angle estimation from acc
-double gyr_delta[3];
+float gyr_delta[3];
 float   alpha = 0.02;        //first complementary filter parameter
 float   beta  = 0.5;        //second complementary filter parameter
 float   gamma = 0;          //yaw speed complementary filter parameter //NOTA: ERA 0.7
@@ -61,7 +61,7 @@ float   ang_speed[3];       //velocitÃ  angolari
 FifoReg fiforeg(8);
 int FifoRegNew[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 short int fifoRegIndex = 0;
-double average_delta_yaw;
+float average_delta_yaw;
 
 //PID coefficients (Yaw, Pitch, Roll)
 ///NOTE: THEY NEED TO BE TUNED 
@@ -363,13 +363,13 @@ void provaMotori(){
 void provaSensori(){
     float tot_gyr_angle[3] = {0., 0., 0.};
     float purely_gyroscopic_angle_est[2] = {0., 0.};
-    double totalpitchf = 0.;
-    double totalrollf = 0.;
-    double totalyawf = 0.;
+    float totalpitchf = 0.;
+    float totalrollf = 0.;
+    float totalyawf = 0.;
 
     short counter = 0;
 
-    double gyroscope_conversion_constant = 1/(FREQ*GSCF);
+    float gyroscope_conversion_constant = 1/(FREQ*GSCF);
 
     while(true) {
         CycleTimer.start();
@@ -434,7 +434,6 @@ void provaSensori(){
             continue;
         }
 
-        ///TODO: TEST THIS! 
         totalpitchf /= FILTERING_ORDER;
         totalrollf  /= FILTERING_ORDER;
 
@@ -473,13 +472,13 @@ void main_loop(){
 
     float tot_gyr_angle[3] = {0., 0., 0.};
 
-    double totalpitchf = 0.;
-    double totalrollf = 0.;
-    double totalyawf = 0.;
+    float totalpitchf = 0.;
+    float totalrollf = 0.;
+    float totalyawf = 0.;
 
     short counter = 0;
 
-    double gyroscope_conversion_constant = 1/(FREQ*GSCF);
+    float const gyroscope_conversion_constant = 1/(FREQ*GSCF);
     int read_throttle = 0;
 /* */
 

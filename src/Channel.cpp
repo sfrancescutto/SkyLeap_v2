@@ -18,14 +18,13 @@ Channel::Channel(PinName pin, int num) : interrupt(pin) {    //constructor
 
 void Channel::start() {
     timer.start();
-    timer.reset();
     }        //IRS: start the timer
 
 void Channel::stop() {                           //IRS: stop the timer
     timer.stop();
     // time  = timer.read_us()-1000;       //return time -1000
     time = timer.elapsed_time().count() - 1000;
-    timer.reset();                      //reset timer
+    // timer.reset();                      //reset timer
 }
 
 void Channel::find_interval(){     //this function verify if value exceed border
@@ -59,10 +58,11 @@ void Channel::calibrate() {
         } else 
         if (calibrated<0) {
         calibrated=0;
-        } else
-        if (calibrated<510 && calibrated>490){ calibrated=500; } //?  //Pare che una banda morta migliori le prestazioni...
-    last_values[i] = calibrated;
-    i = ++i%2;
+        } 
+        // else
+        //if (calibrated<510 && calibrated>490){ calibrated=500; } //?  //Pare che una banda morta migliori le prestazioni...
+    // last_values[i] = calibrated;
+    // i = ++i%2;
     //if (calibrated<515 && calibrated>485){ calibrated=500; } //?  //Pare che una banda morta migliori le prestazioni...
 }
 
