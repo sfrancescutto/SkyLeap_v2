@@ -170,7 +170,8 @@ Quaternion sidePosition(0.,0.,1.,0.);
 Quaternion rotation;
 
 //ESC declaration and variables
-int power[4] = {1191, 1056, 1052, 1167};
+// int power[4] = {1191, 1056, 1052, 1167};
+int power[4] = {1000, 1000, 1000, 1000};
 PwmOut ESC1(PTB0);
 PwmOut ESC2(PTB1);
 PwmOut ESC3(PTB2);
@@ -227,13 +228,12 @@ void provaRadiocomando(){
         channel3.calibrate();
         channel4.calibrate();
 
-        //set point: pid objective ( * 1.82 = max 10Â°)
-        set_point[0]  = channel1.read() - 500;
-        set_point[1]  = channel2.read() - 500;
-        set_point[2]  = channel4.read() - 500;
-        read_throttle = channel3.read();
+        set_point[0]  = channel1.read()/5 - 100;
+        set_point[1]  = channel2.read()/5 - 100;
+        set_point[2]  = channel4.read()/5 - 100;
+        read_throttle = channel3.read()/10;
 
-        DEBUG_PRINT("%d, %d, %d, %d\n",set_point[0], set_point[1], read_throttle, set_point[2]);
+        DEBUG_PRINT("%d,\t%d,\t%d,\t%d\n",set_point[0], set_point[1], read_throttle, set_point[2]);
 
         CycleEnd = CycleTimer.elapsed_time().count();
         if (CycleTime < PERIOD) { //Fixed at 50Hz
@@ -256,7 +256,6 @@ void provaMotori(){
             power[1] = 1000;
             power[2] = 1000;
             power[3] = 1000;
-
             do {
                 printf("Motore? (0-3) (9 -> Torna al menu precedente)");
                 scanf("%d",&motore);
@@ -277,11 +276,8 @@ void provaMotori(){
             printf("Invio al motore %d la potenza di %d/2000...\n",motore ,power[motore]);
 
             //4 seconds of test
+            CycleTimer.reset();
             for(int i = 0;i<PERIODS_IN_4_SECONDS;i++) {
-                CycleTimer.start();
-                ///TODO: PROBABLY REMOVE THIS v
-                CycleBegin = CycleTimer.elapsed_time().count();
-
                 ESC1.pulsewidth_us(power[0]);
                 ESC2.pulsewidth_us(power[1]);
                 ESC3.pulsewidth_us(power[2]);
@@ -289,11 +285,11 @@ void provaMotori(){
 
                 CycleTime = CycleTimer.elapsed_time().count();
 
+
                 if (CycleTime < PERIOD) {
                     wait_us(int(PERIOD - CycleTime));
                 } else 
-                    wait_us(PERIOD-CycleTime);
-                CycleTimer.reset();
+                    CycleTimer.reset();
             }
         }
     }
@@ -310,7 +306,7 @@ void provaSensori(){
 
     double gyroscope_conversion_constant = 1/(FREQ*GSCF);
 
-    for(int k = 0;k>-1;k++) {
+    while(true) {
         CycleTimer.start();
 
         readAccelData(raw_acc);
@@ -387,9 +383,9 @@ void provaSensori(){
         tot_gyr_angle[Y] = 0.;
         tot_gyr_angle[Z] = 0.;
 
-        DEBUG_PRINT("FILT:\nP: %d\nR: %d\nY: %d\n\n",int(totalpitchf*RAD2DEG), int(totalrollf*RAD2DEG), int(totalyawf));
-        DEBUG_PRINT("GYR:\nP: %d\nR: %d\n\n",int(purely_gyroscopic_angle_est[Y]),int(purely_gyroscopic_angle_est[X]));
-        DEBUG_PRINT("ACC:\nP: %d\nR: %d\n\n",int(acc_angle[PITCH]*RAD2DEG),int(acc_angle[ROLL]*RAD2DEG));
+        DEBUG_PRINT("FILT:P:%d\tR:%d\tY: %d\t\t",int(totalpitchf*RAD2DEG), int(totalrollf*RAD2DEG), int(totalyawf));
+        DEBUG_PRINT("GYR: P: %d\tR: %d\t\t",int(purely_gyroscopic_angle_est[Y]),int(purely_gyroscopic_angle_est[X]));
+        DEBUG_PRINT("ACC:  P: %d\tR: %d\n",int(acc_angle[PITCH]*RAD2DEG),int(acc_angle[ROLL]*RAD2DEG));
 
         totalpitchf = 0.;
         totalrollf  = 0.;

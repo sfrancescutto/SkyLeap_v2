@@ -18,6 +18,7 @@ Channel::Channel(PinName pin, int num) : interrupt(pin) {    //constructor
 
 void Channel::start() {
     timer.start();
+    timer.reset();
     }        //IRS: start the timer
 
 void Channel::stop() {                           //IRS: stop the timer
@@ -59,7 +60,7 @@ void Channel::calibrate() {
         if (calibrated<0) {
         calibrated=0;
         } else
-        if (calibrated<515 && calibrated>485){ calibrated=500; } //?  //Pare che una banda morta migliori le prestazioni...
+        if (calibrated<510 && calibrated>490){ calibrated=500; } //?  //Pare che una banda morta migliori le prestazioni...
     last_values[i] = calibrated;
     i = ++i%2;
     //if (calibrated<515 && calibrated>485){ calibrated=500; } //?  //Pare che una banda morta migliori le prestazioni...
