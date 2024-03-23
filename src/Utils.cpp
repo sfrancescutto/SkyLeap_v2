@@ -530,7 +530,7 @@ void provaSensori(){
         DEBUG_PRINT("ACC:  P: %d\tR: %d\n",int(acc_angle[PITCH]*RAD2DEG),int(acc_angle[ROLL]*RAD2DEG));
 
         CycleEnd = CycleTimer.elapsed_time().count();
-        printf("%d\n",CycleEnd);
+        printf("%ld\n",CycleEnd);
         if (CycleEnd < PERIOD) {
             wait_us(int(PERIOD - CycleEnd));
         } else 
